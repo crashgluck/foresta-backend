@@ -14,8 +14,17 @@ class ImportStatus(models.TextChoices):
 
 
 class IssueSeverity(models.TextChoices):
+    FATAL = 'FATAL', 'Fatal'
     WARNING = 'WARNING', 'Warning'
     ERROR = 'ERROR', 'Error'
+
+
+class ImportRowAction(models.TextChoices):
+    CREATED = 'CREATED', 'Creado'
+    UPDATED = 'UPDATED', 'Actualizado'
+    SKIPPED = 'SKIPPED', 'Omitido'
+    ERROR = 'ERROR', 'Error'
+    WARNING = 'WARNING', 'Advertencia'
 
 
 class ImportUploadStatus(models.TextChoices):
@@ -79,6 +88,27 @@ class ImportIssue(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+
+class ImportRowResult(models.Model):
+    import_job = models.ForeignKey(ImportJob, on_delete=models.CASCADE, related_name='row_results')
+    sheet_result = models.ForeignKey(ImportSheetResult, null=True, blank=True, on_delete=models.SET_NULL, related_name='row_results')
+    sheet_name = models.CharField(max_length=120)
+    row_number = models.PositiveIntegerField(null=True, blank=True)
+    entity = models.CharField(max_length=120, blank=True)
+    record_identifier = models.CharField(max_length=255, blank=True)
+    action = models.CharField(max_length=20, choices=ImportRowAction.choices)
+    message = models.TextField(blank=True)
+    fields_affected = models.JSONField(default=list, blank=True)
+    issue_codes = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['sheet_name', 'row_number', 'created_at']
+        indexes = [
+            models.Index(fields=['import_job', 'action']),
+            models.Index(fields=['sheet_name', 'row_number']),
+        ]
 
 
 class ImportUploadSession(models.Model):

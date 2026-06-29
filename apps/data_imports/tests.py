@@ -2,12 +2,13 @@ import os
 import tempfile
 
 from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
 from openpyxl import Workbook
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import User, UserRole
 from apps.core.normalizers import normalize_parcel_code
-from apps.data_imports.models import ImportJob, ImportStatus
+from apps.data_imports.models import ImportJob, ImportRowAction, ImportRowResult, ImportStatus
 from apps.data_imports.services.excel_importer import ExcelMasterImporter
 from apps.parcels.models import Parcel
 
@@ -101,6 +102,46 @@ class ImportApiFlowTests(APITestCase):
         finally:
             if os.path.exists(file_path):
                 os.remove(file_path)
+
+    def test_preview_invalid_workbook_returns_failed_job_with_fatal_issue(self):
+        upload = SimpleUploadedFile(
+            'maestro.xlsx',
+            b'not a valid workbook',
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+
+        response = self.client.post(
+            '/api/v1/imports/jobs/preview-upload/',
+            data={'file': upload},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['preview_job']['status'], ImportStatus.FAILED)
+        self.assertTrue(any(issue['severity'] == 'FATAL' for issue in response.data['preview_issues']))
+
+    def test_import_records_row_result_for_invalid_required_decimal(self):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Mora GC'
+        ws.append(['PARCELA', 'MORA CG UF', 'TOTAL PESOS'])
+        ws.append(['B-01', '1,5', 'no-es-numero'])
+
+        fd, path = tempfile.mkstemp(suffix='.xlsx')
+        os.close(fd)
+        try:
+            wb.save(path)
+            importer = ExcelMasterImporter(file_path=path, dry_run=False, sheets=['Mora GC'])
+            job = importer.run()
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+        self.assertEqual(job.status, ImportStatus.FAILED)
+        self.assertGreaterEqual(job.total_errors, 1)
+        self.assertTrue(
+            ImportRowResult.objects.filter(import_job=job, action=ImportRowAction.ERROR, row_number=2).exists()
+        )
 
     def test_cancel_running_job(self):
         job = ImportJob.objects.create(
