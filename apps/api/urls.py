@@ -5,7 +5,7 @@ from apps.access_control.views import AccessRecordViewSet, BlacklistEntryViewSet
 from apps.acquisitions.views import RFIDCardViewSet, RemoteControlViewSet, VehicleLogoViewSet
 from apps.api.views import DashboardSummaryView
 from apps.audits.views import AuditEventLogViewSet, UserSessionLogViewSet
-from apps.data_imports.views import ImportIssueViewSet, ImportJobViewSet
+from apps.data_imports.views import ImportIssueViewSet, ImportJobViewSet, ImportRowResultViewSet
 from apps.finance.views import (
     CommonExpenseDebtViewSet,
     FinanceConsolidatedView,
@@ -42,6 +42,7 @@ router.register('anotaciones', AdministrativeNoteViewSet, basename='anotaciones'
 router.register('obras', ParcelWorkStatusViewSet, basename='obras')
 router.register('imports/jobs', ImportJobViewSet, basename='import-jobs')
 router.register('imports/issues', ImportIssueViewSet, basename='import-issues')
+router.register('imports/row-results', ImportRowResultViewSet, basename='import-row-results')
 router.register('access/access-records', AccessRecordViewSet, basename='access-records')
 router.register('access/blacklist', BlacklistEntryViewSet, basename='access-blacklist')
 router.register('maps/objectives', ObjectiveViewSet, basename='map-objectives')

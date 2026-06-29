@@ -12,9 +12,12 @@ from rest_framework.response import Response
 
 from apps.accounts.models import UserRole
 from apps.core.permissions import RoleBasedActionPermission
-from apps.data_imports.models import ImportIssue, ImportJob, ImportStatus, ImportUploadSession, ImportUploadStatus
-from apps.data_imports.serializers import ImportIssueSerializer, ImportJobSerializer, ImportUploadSessionSerializer
+from apps.data_imports.models import ImportIssue, ImportJob, ImportRowResult, ImportStatus, ImportUploadSession, ImportUploadStatus
+from apps.data_imports.serializers import ImportIssueSerializer, ImportJobSerializer, ImportRowResultSerializer, ImportUploadSessionSerializer
 from apps.data_imports.services.excel_importer import ExcelMasterImporter
+
+
+SUPPORTED_EXCEL_EXTENSIONS = ('.xlsx', '.xlsm', '.xltx', '.xltm')
 
 
 def _parse_sheets(raw_value):
@@ -69,6 +72,26 @@ def _file_sha256(upload_file) -> str:
     return digest.hexdigest()
 
 
+def _validate_upload(upload):
+    if not upload:
+        return 'Debes adjuntar un archivo Excel en el campo "file".'
+    if not upload.name.lower().endswith(SUPPORTED_EXCEL_EXTENSIONS):
+        return 'Formato no soportado. Usa un archivo .xlsx/.xlsm. Los .xls antiguos deben convertirse antes de importar.'
+    if getattr(upload, 'size', 0) <= 0:
+        return 'El archivo esta vacio o no pudo leerse.'
+    return ''
+
+
+def _job_response_payload(job: ImportJob, issues_key='issues', row_results_key='row_results', limit=400):
+    issues = job.issues.order_by('-severity', 'sheet_name', 'row_number', '-created_at')[:limit]
+    row_results = job.row_results.order_by('sheet_name', 'row_number', 'created_at')[:limit]
+    return {
+        'job': ImportJobSerializer(job).data,
+        issues_key: ImportIssueSerializer(issues, many=True).data,
+        row_results_key: ImportRowResultSerializer(row_results, many=True).data,
+    }
+
+
 class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ImportJob.objects.all().prefetch_related('sheet_results')
     serializer_class = ImportJobSerializer
@@ -115,10 +138,9 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['post'], url_path='preview-upload')
     def preview_upload(self, request):
         upload = request.FILES.get('file')
-        if not upload:
-            return Response({'detail': 'Debes adjuntar un archivo Excel en el campo "file".'}, status=status.HTTP_400_BAD_REQUEST)
-        if not upload.name.lower().endswith(('.xlsx', '.xlsm', '.xltx', '.xltm')):
-            return Response({'detail': 'Formato no soportado. Usa un archivo .xlsx/.xlsm.'}, status=status.HTTP_400_BAD_REQUEST)
+        upload_error = _validate_upload(upload)
+        if upload_error:
+            return Response({'detail': upload_error}, status=status.HTTP_400_BAD_REQUEST)
 
         sheets = _parse_sheets(request.data.get('sheets'))
         try:
@@ -144,20 +166,25 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
             sheets=sheets,
             column_mapping=column_mapping,
         )
-        structure = importer.inspect_structure()
+        try:
+            structure = importer.inspect_structure()
+        except Exception:
+            structure = {}
         preview_job = importer.run()
+        structure = structure or (preview_job.details or {}).get('structure', {})
 
         session.preview_job = preview_job
         session.status = ImportUploadStatus.PREVIEWED
         session.save(update_fields=['preview_job', 'status', 'last_used_at'])
 
-        preview_issues = preview_job.issues.order_by('-severity', 'sheet_name', 'row_number', '-created_at')[:400]
+        preview_payload = _job_response_payload(preview_job, issues_key='preview_issues', row_results_key='preview_row_results')
         return Response(
             {
                 'upload_session': ImportUploadSessionSerializer(session).data,
                 'structure': structure,
-                'preview_job': ImportJobSerializer(preview_job).data,
-                'preview_issues': ImportIssueSerializer(preview_issues, many=True).data,
+                'preview_job': preview_payload['job'],
+                'preview_issues': preview_payload['preview_issues'],
+                'preview_row_results': preview_payload['preview_row_results'],
             },
             status=status.HTTP_201_CREATED,
         )
@@ -196,13 +223,8 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
         session.column_mapping = column_mapping
         session.save(update_fields=['executed_job', 'status', 'selected_sheets', 'column_mapping', 'last_used_at'])
 
-        return Response(
-            {
-                'upload_session': ImportUploadSessionSerializer(session).data,
-                'job': ImportJobSerializer(job).data,
-            },
-            status=status.HTTP_201_CREATED,
-        )
+        job_payload = _job_response_payload(job)
+        return Response({'upload_session': ImportUploadSessionSerializer(session).data, **job_payload}, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['get'], url_path='issues-report')
     def issues_report(self, request, pk=None):
@@ -291,6 +313,19 @@ class ImportIssueViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ImportIssueSerializer
     permission_classes = [RoleBasedActionPermission]
     filterset_fields = ['severity', 'sheet_name', 'import_job']
+    ordering_fields = ['created_at', 'row_number']
+
+    required_roles_per_action = {
+        'list': UserRole.OPERADOR,
+        'retrieve': UserRole.OPERADOR,
+    }
+
+
+class ImportRowResultViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = ImportRowResult.objects.select_related('import_job', 'sheet_result').all()
+    serializer_class = ImportRowResultSerializer
+    permission_classes = [RoleBasedActionPermission]
+    filterset_fields = ['action', 'sheet_name', 'import_job']
     ordering_fields = ['created_at', 'row_number']
 
     required_roles_per_action = {
