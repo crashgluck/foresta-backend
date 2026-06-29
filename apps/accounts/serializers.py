@@ -63,6 +63,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             password=password,
             role=UserRole.CONSULTA,
             actor_type=UserActorType.CONSULTA_EJECUTIVA,
+            is_active=False,
             **validated_data,
         )
         return user

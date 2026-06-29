@@ -14,12 +14,11 @@ class AuthFlowTests(APITestCase):
         }
         register = self.client.post('/api/v1/auth/register/', register_payload, format='json')
         self.assertEqual(register.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(User.objects.filter(email='nuevo@example.com').exists())
+        user = User.objects.get(email='nuevo@example.com')
+        self.assertFalse(user.is_active)
 
         login = self.client.post('/api/v1/auth/login/', {'email': 'nuevo@example.com', 'password': 'ClaveSegura123'}, format='json')
-        self.assertEqual(login.status_code, status.HTTP_200_OK)
-        self.assertIn('access', login.data)
-        self.assertIn('refresh', login.data)
+        self.assertEqual(login.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_change_password(self):
         user = User.objects.create_user(email='test@example.com', password='Vieja12345', role=UserRole.OPERADOR)
