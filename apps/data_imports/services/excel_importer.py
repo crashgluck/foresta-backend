@@ -128,59 +128,64 @@ class ExcelMasterImporter:
         }
 
     def inspect_structure(self, workbook=None):
-        workbook = workbook or load_workbook(self.file_path, data_only=True)
-        parser_map = self._parser_map()
-        checks = []
-        selected_unknown = sorted((self.sheets_filter or set()) - set(parser_map.keys()))
-        for sheet_name in parser_map.keys():
-            if self.sheets_filter and sheet_name not in self.sheets_filter:
-                continue
-            required_keywords = self.SHEET_REQUIREMENTS.get(sheet_name, [])
-            if sheet_name not in workbook.sheetnames:
+        should_close_workbook = workbook is None
+        workbook = workbook or load_workbook(self.file_path, data_only=True, read_only=True)
+        try:
+            parser_map = self._parser_map()
+            checks = []
+            selected_unknown = sorted((self.sheets_filter or set()) - set(parser_map.keys()))
+            for sheet_name in parser_map.keys():
+                if self.sheets_filter and sheet_name not in self.sheets_filter:
+                    continue
+                required_keywords = self.SHEET_REQUIREMENTS.get(sheet_name, [])
+                if sheet_name not in workbook.sheetnames:
+                    checks.append(
+                        {
+                            'sheet_name': sheet_name,
+                            'exists': False,
+                            'header_found': False,
+                            'required_keywords': required_keywords,
+                            'missing_keywords': required_keywords,
+                            'header_row': None,
+                        }
+                    )
+                    continue
+                ws = workbook[sheet_name]
+                header_row, headers = self._find_header(ws, required_keywords) if required_keywords else (1, {})
+                missing = []
+                if required_keywords and headers:
+                    missing = [
+                        keyword
+                        for keyword in required_keywords
+                        if not any(self._header_matches(key, self._aliases_for(keyword, sheet_name)) for key in headers.keys())
+                    ]
+                elif required_keywords:
+                    missing = list(required_keywords)
+
                 checks.append(
                     {
                         'sheet_name': sheet_name,
-                        'exists': False,
-                        'header_found': False,
+                        'exists': True,
+                        'header_found': bool(header_row),
                         'required_keywords': required_keywords,
-                        'missing_keywords': required_keywords,
-                        'header_row': None,
+                        'missing_keywords': missing,
+                        'header_row': header_row or None,
+                        'row_count': max(ws.max_row - (header_row or 1), 0),
+                        'columns': list(headers.keys()),
                     }
                 )
-                continue
-            ws = workbook[sheet_name]
-            header_row, headers = self._find_header(ws, required_keywords) if required_keywords else (1, {})
-            missing = []
-            if required_keywords and headers:
-                missing = [
-                    keyword
-                    for keyword in required_keywords
-                    if not any(self._header_matches(key, self._aliases_for(keyword, sheet_name)) for key in headers.keys())
-                ]
-            elif required_keywords:
-                missing = list(required_keywords)
 
-            checks.append(
-                {
-                    'sheet_name': sheet_name,
-                    'exists': True,
-                    'header_found': bool(header_row),
-                    'required_keywords': required_keywords,
-                    'missing_keywords': missing,
-                    'header_row': header_row or None,
-                    'row_count': max(ws.max_row - (header_row or 1), 0),
-                    'columns': list(headers.keys()),
-                }
-            )
-
-        processable = [check for check in checks if check.get('exists') and check.get('header_found') and not check.get('missing_keywords')]
-        return {
-            'available_sheets': workbook.sheetnames,
-            'selected_unknown_sheets': selected_unknown,
-            'checks': checks,
-            'processable_sheets': [check['sheet_name'] for check in processable],
-            'is_structurally_valid': not selected_unknown and bool(processable),
-        }
+            processable = [check for check in checks if check.get('exists') and check.get('header_found') and not check.get('missing_keywords')]
+            return {
+                'available_sheets': workbook.sheetnames,
+                'selected_unknown_sheets': selected_unknown,
+                'checks': checks,
+                'processable_sheets': [check['sheet_name'] for check in processable],
+                'is_structurally_valid': not selected_unknown and bool(processable),
+            }
+        finally:
+            if should_close_workbook:
+                workbook.close()
 
     def run(self) -> ImportJob:
         if not self.file_path.exists():
@@ -204,7 +209,7 @@ class ExcelMasterImporter:
         parser_map = self._parser_map()
 
         try:
-            workbook = load_workbook(self.file_path, data_only=True)
+            workbook = load_workbook(self.file_path, data_only=True, read_only=True)
         except (InvalidFileException, BadZipFile, OSError, ValueError, KeyError) as exc:
             logger.warning('Archivo Excel invalido: %s (%s)', self.file_path, exc)
             return self._fail_job_with_fatal(job, 'invalid_workbook', f'No se pudo abrir el Excel: {exc}')
@@ -286,19 +291,22 @@ class ExcelMasterImporter:
             if cancelled:
                 break
 
-        self._finalize_job(job, cancelled=cancelled)
-        logger.info(
-            'Importacion finalizada: job=%s status=%s rows=%s created=%s updated=%s skipped=%s errors=%s warnings=%s',
-            job.id,
-            job.status,
-            (job.details or {}).get('summary', {}).get('total_rows_read'),
-            job.total_inserted,
-            job.total_updated,
-            job.total_skipped,
-            job.total_errors,
-            job.total_warnings,
-        )
-        return job
+        try:
+            self._finalize_job(job, cancelled=cancelled)
+            logger.info(
+                'Importacion finalizada: job=%s status=%s rows=%s created=%s updated=%s skipped=%s errors=%s warnings=%s',
+                job.id,
+                job.status,
+                (job.details or {}).get('summary', {}).get('total_rows_read'),
+                job.total_inserted,
+                job.total_updated,
+                job.total_skipped,
+                job.total_errors,
+                job.total_warnings,
+            )
+            return job
+        finally:
+            workbook.close()
 
     def _fail_job_with_fatal(self, job: ImportJob, error_code: str, message: str) -> ImportJob:
         self._issue(job, None, IssueSeverity.FATAL, 'WORKBOOK', None, None, error_code, message)

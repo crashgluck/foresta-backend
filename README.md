@@ -100,6 +100,10 @@ Base URL: `/api/v1/`
 - `CRUD /supervisor/rounds/`
 - `CRUD /supervisor/notifications/`
 - `GET /supervisor/notifications/export_csv/`
+- `GET /iot/components/`
+- `POST /iot/components/{component_id}/on/`
+- `POST /iot/components/{component_id}/off/`
+- `POST /iot/components/{component_id}/pulse/`
 
 ### Importaciones
 
@@ -146,6 +150,18 @@ Importantes:
 - `CORS_ALLOWED_ORIGINS`
 - `JWT_ACCESS_MINUTES`
 - `JWT_REFRESH_DAYS`
+
+Integracion Nodotech IoT:
+
+- `NODOTECH_API_BASE_URL`
+- `NODOTECH_EMAIL`
+- `NODOTECH_PASSWORD`
+- `NODOTECH_REQUEST_TIMEOUT`
+- `NODOTECH_DEFAULT_PULSE_MS`
+- `NODOTECH_ACCESS_TOKEN_CACHE_SECONDS`
+- `NODOTECH_REFRESH_TOKEN_CACHE_SECONDS`
+
+Las credenciales Nodotech son de uso exclusivo del backend y no deben exponerse al frontend.
 
 ## 8. Migraciones y servidor
 

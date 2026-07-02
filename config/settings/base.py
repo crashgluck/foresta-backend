@@ -6,7 +6,8 @@ from datetime import timedelta
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(BASE_DIR / '.env')
+env_path = BASE_DIR / '.env'
+load_dotenv(env_path if env_path.exists() else BASE_DIR / '.env.real')
 logger = logging.getLogger(__name__)
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'dev-only-change-this-key-to-a-secure-value-1234567890')
@@ -43,6 +44,7 @@ INSTALLED_APPS = [
     'apps.data_imports',
     'apps.audits',
     'apps.api',
+    'apps.iot',
 ]
 
 MIDDLEWARE = [
@@ -78,24 +80,45 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 ASGI_APPLICATION = 'config.asgi.application'
 
-DB_ENGINE = os.getenv('DB_ENGINE', 'sqlite').lower()
-if DB_ENGINE == 'postgres':
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.getenv('DB_NAME', 'parcelas'),
-            'USER': os.getenv('DB_USER', 'postgres'),
-            'PASSWORD': os.getenv('DB_PASSWORD', ''),
-            'HOST': os.getenv('DB_HOST', 'localhost'),
-            'PORT': os.getenv('DB_PORT', '5432'),
-        }
+DB_ENGINE = os.getenv('DB_ENGINE', 'sqlite').strip().lower()
+
+# Alias para leer y exportar la base SQLite antigua.
+# Localmente apunta a backend/db.sqlite3.
+DATABASES = {
+    'sqlite_old': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
+}
+
+if DB_ENGINE == 'mysql':
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': os.getenv('DB_NAME', ''),
+        'USER': os.getenv('DB_USER', ''),
+        'PASSWORD': os.getenv('DB_PASSWORD', ''),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '3306'),
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+        },
+    }
+
+elif DB_ENGINE == 'postgres':
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME', 'parcelas'),
+        'USER': os.getenv('DB_USER', 'postgres'),
+        'PASSWORD': os.getenv('DB_PASSWORD', ''),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '5432'),
+    }
+
 else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
+    # Desarrollo local normal: SQLite sigue siendo la base principal.
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -122,6 +145,15 @@ CORS_ALLOWED_ORIGINS = [o.strip() for o in os.getenv('CORS_ALLOWED_ORIGINS', 'ht
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',') if o.strip()]
+
+NODOTECH_API_BASE_URL = os.getenv('NODOTECH_API_BASE_URL', 'https://nodotech.aguasyservicioslaz.cl/api/v1').rstrip('/')
+NODOTECH_EMAIL = os.getenv('NODOTECH_EMAIL', '')
+NODOTECH_PASSWORD = os.getenv('NODOTECH_PASSWORD', '')
+NODOTECH_REQUEST_TIMEOUT = int(os.getenv('NODOTECH_REQUEST_TIMEOUT', os.getenv('NODOTECH_TIMEOUT_SECONDS', '10')))
+NODOTECH_TIMEOUT_SECONDS = NODOTECH_REQUEST_TIMEOUT
+NODOTECH_DEFAULT_PULSE_MS = int(os.getenv('NODOTECH_DEFAULT_PULSE_MS', '700'))
+NODOTECH_ACCESS_TOKEN_CACHE_SECONDS = int(os.getenv('NODOTECH_ACCESS_TOKEN_CACHE_SECONDS', '840'))
+NODOTECH_REFRESH_TOKEN_CACHE_SECONDS = int(os.getenv('NODOTECH_REFRESH_TOKEN_CACHE_SECONDS', '604800'))
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -189,4 +221,3 @@ LOGGING = {
         'level': os.getenv('LOG_LEVEL', 'INFO'),
     },
 }
-

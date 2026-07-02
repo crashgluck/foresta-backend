@@ -75,5 +75,6 @@ urlpatterns = [
     path('maps/owners-map/', OwnersMapView.as_view(), name='owners-map'),
     path('maps/visit-summary/', ParcelVisitSummaryView.as_view(), name='parcel-visit-summary'),
     path('maps/parcel-options/', ParcelOptionsView.as_view(), name='parcel-options'),
+    path('iot/', include('apps.iot.urls')),
     path('', include('apps.accounts.urls')),
 ]
