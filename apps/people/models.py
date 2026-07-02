@@ -13,7 +13,7 @@ class Person(BaseDomainModel):
     nombre_completo = models.CharField(max_length=255)
     rut = models.CharField(max_length=20, blank=True)
     rut_dv = models.CharField(max_length=2, blank=True)
-    rut_normalizado = models.CharField(max_length=12, blank=True, db_index=True)
+    rut_normalizado = models.CharField(max_length=20, blank=True, db_index=True)
     telefono_principal = models.CharField(max_length=30, blank=True)
     telefono_secundario = models.CharField(max_length=30, blank=True)
     email = models.EmailField(blank=True)
