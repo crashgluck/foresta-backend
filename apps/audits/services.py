@@ -1,6 +1,8 @@
 import json
 from typing import Any
 
+from django.conf import settings
+
 from apps.audits.models import AuditAction, AuditEventLog, SessionAction, UserSessionLog
 
 SENSITIVE_KEYS = {'password', 'old_password', 'new_password', 'access', 'refresh', 'token'}
@@ -30,6 +32,8 @@ def sanitize_value(value: Any):
 
 
 def parse_request_payload(request):
+    if not settings.AUDIT_LOG_PAYLOAD:
+        return {}
     if request.method in {'GET', 'HEAD', 'OPTIONS'}:
         return {}
 
@@ -45,7 +49,7 @@ def parse_request_payload(request):
             return {'_info': 'payload unavailable'}
     if not body:
         return {}
-    if len(body) > 12000:
+    if settings.AUDIT_MAX_PAYLOAD_BYTES <= 0 or len(body) > settings.AUDIT_MAX_PAYLOAD_BYTES:
         return {'_info': 'payload omitted by size'}
 
     try:
@@ -67,6 +71,10 @@ def build_response_summary(response):
 
 
 def create_session_log(*, request, action: str, success: bool, user=None, auth_identifier: str = '', metadata=None):
+    if not settings.SESSION_AUDIT_ENABLED:
+        return
+    if action == SessionAction.REFRESH and not settings.SESSION_AUDIT_LOG_REFRESH:
+        return
     try:
         UserSessionLog.objects.create(
             user=user if getattr(user, 'is_authenticated', False) else None,
@@ -123,7 +131,7 @@ def create_audit_event(
             message=_trim_string(message or f'{method} {request.path}', max_length=255),
             ip_address=get_client_ip(request) or None,
             user_agent=_trim_string(request.META.get('HTTP_USER_AGENT', ''), max_length=1000),
-            query_params=sanitize_value(dict(request.GET.items())),
+            query_params=sanitize_value(dict(request.GET.items())) if settings.AUDIT_LOG_QUERY_PARAMS else {},
             payload=parse_request_payload(request),
             response_summary=build_response_summary(response),
         )

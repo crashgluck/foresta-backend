@@ -1,4 +1,9 @@
+from django.conf import settings
+
 from apps.audits.services import create_audit_event
+
+
+SAFE_METHODS = {'GET', 'HEAD'}
 
 
 class AuditTrailMiddleware:
@@ -19,11 +24,17 @@ class AuditTrailMiddleware:
     def __call__(self, request):
         response = self.get_response(request)
 
+        if not settings.AUDIT_TRAIL_ENABLED:
+            return response
         if request.method == 'OPTIONS':
+            return response
+        if request.method.upper() in SAFE_METHODS and not settings.AUDIT_LOG_READS:
             return response
         if not request.path.startswith('/api/v1/'):
             return response
         if request.path.startswith(self.EXCLUDED_PREFIXES):
+            return response
+        if settings.AUDIT_EXCLUDED_PREFIXES and request.path.startswith(settings.AUDIT_EXCLUDED_PREFIXES):
             return response
 
         try:

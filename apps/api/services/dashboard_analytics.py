@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.db.models import Count, Sum
 from django.db.models.functions import TruncDate, TruncMonth, TruncWeek
 from django.utils import timezone
@@ -168,6 +169,11 @@ class DashboardAnalyticsService:
             date_to = today
         if date_from > date_to:
             date_from = date_to
+
+        max_days = settings.DASHBOARD_MAX_RANGE_DAYS
+        if (date_to - date_from).days + 1 > max_days:
+            date_from = date_to - timedelta(days=max_days - 1)
+            normalized = 'custom_limited' if normalized == 'custom' else normalized
 
         days = (date_to - date_from).days + 1
         previous_to = date_from - timedelta(days=1)

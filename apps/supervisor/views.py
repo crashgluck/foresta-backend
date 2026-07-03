@@ -6,6 +6,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 
 from apps.accounts.models import UserRole
+from apps.core.parcel_display import primary_owner_prefetch
 from apps.core.permissions import RoleBasedActionPermission
 from apps.supervisor.models import NotificationFine, Round, Shift
 from apps.supervisor.serializers import NotificationFineSerializer, RoundSerializer, ShiftSerializer
@@ -48,7 +49,7 @@ class RoundViewSet(viewsets.ModelViewSet):
 
 
 class NotificationFineViewSet(viewsets.ModelViewSet):
-    queryset = NotificationFine.objects.select_related('parcela', 'persona', 'shift').prefetch_related('parcela__ownerships__persona')
+    queryset = NotificationFine.objects.select_related('parcela', 'persona', 'shift').prefetch_related(primary_owner_prefetch())
     serializer_class = NotificationFineSerializer
     permission_classes = [RoleBasedActionPermission]
     search_fields = ['title', 'description', 'parcela__codigo_parcela', 'persona__nombre_completo']

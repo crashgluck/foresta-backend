@@ -142,6 +142,8 @@ cp .env.example .env
 
 Ver `.env.example`.
 
+Para hosting compartido/cPanel, revisar tambien `CPANEL_OPTIMIZATION.md`.
+
 Importantes:
 
 - `DJANGO_SECRET_KEY`

@@ -1,6 +1,10 @@
+from django.conf import settings
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from apps.core.thread_local import set_current_user
+
+
+SAFE_METHODS = {'GET', 'HEAD', 'OPTIONS'}
 
 
 class CurrentUserMiddleware:
@@ -11,7 +15,7 @@ class CurrentUserMiddleware:
     def __call__(self, request):
         resolved_user = getattr(request, 'user', None)
 
-        if not getattr(resolved_user, 'is_authenticated', False):
+        if not getattr(resolved_user, 'is_authenticated', False) and self._should_authenticate_early(request):
             try:
                 header = self.jwt_auth.get_header(request)
                 if header:
@@ -24,6 +28,14 @@ class CurrentUserMiddleware:
 
         request.audit_user = resolved_user
         set_current_user(resolved_user)
-        response = self.get_response(request)
-        set_current_user(None)
-        return response
+        try:
+            return self.get_response(request)
+        finally:
+            set_current_user(None)
+
+    def _should_authenticate_early(self, request) -> bool:
+        if request.method.upper() not in SAFE_METHODS:
+            return True
+        if settings.CURRENT_USER_AUTHENTICATE_SAFE_METHODS:
+            return True
+        return settings.AUDIT_TRAIL_ENABLED and settings.AUDIT_LOG_READS

@@ -4,13 +4,14 @@ from django.utils import timezone
 from rest_framework import viewsets
 
 from apps.accounts.models import UserActorType, UserRole
+from apps.core.parcel_display import primary_owner_prefetch
 from apps.core.permissions import RoleBasedActionPermission
 from apps.missions.models import DroneFlight, Mission, MissionReport
 from apps.missions.serializers import DroneFlightSerializer, MissionReportSerializer, MissionSerializer
 
 
 class MissionViewSet(viewsets.ModelViewSet):
-    queryset = Mission.objects.select_related('parcela', 'persona', 'assigned_to').prefetch_related('parcela__ownerships__persona')
+    queryset = Mission.objects.select_related('parcela', 'persona', 'assigned_to').prefetch_related(primary_owner_prefetch())
     serializer_class = MissionSerializer
     permission_classes = [RoleBasedActionPermission]
     search_fields = ['title', 'description', 'mission_type', 'team_name', 'parcela__codigo_parcela', 'persona__nombre_completo']
@@ -31,7 +32,7 @@ class MissionViewSet(viewsets.ModelViewSet):
 
 
 class DroneFlightViewSet(viewsets.ModelViewSet):
-    queryset = DroneFlight.objects.select_related('pilot', 'parcela', 'persona').prefetch_related('parcela__ownerships__persona')
+    queryset = DroneFlight.objects.select_related('pilot', 'parcela', 'persona').prefetch_related(primary_owner_prefetch())
     serializer_class = DroneFlightSerializer
     permission_classes = [RoleBasedActionPermission]
     search_fields = [

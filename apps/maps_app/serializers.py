@@ -1,9 +1,9 @@
 from rest_framework import serializers
 
-from apps.core.parcel_display import get_parcel_owner_display
+from apps.core.parcel_display import get_parcel_owner_display, get_primary_owner_for_parcel
 from apps.maps_app.models import Objective, ParcelMapGeometry, Visit
 from apps.parcels.models import Parcel, ParcelStatus
-from apps.people.models import OwnershipType, Person
+from apps.people.models import Person
 
 
 class ObjectiveSerializer(serializers.ModelSerializer):
@@ -119,21 +119,7 @@ class ParcelMapItemSerializer(serializers.ModelSerializer):
         if hasattr(parcel, '_map_cached_primary_owner'):
             return getattr(parcel, '_map_cached_primary_owner')
 
-        prefetched = getattr(parcel, 'map_primary_ownerships', None)
-        if prefetched is not None:
-            owner = prefetched[0].persona if prefetched else None
-            setattr(parcel, '_map_cached_primary_owner', owner)
-            return owner
-
-        ownerships = parcel.ownerships.all()
-        owner = next(
-            (
-                ownership.persona
-                for ownership in ownerships
-                if ownership.tipo == OwnershipType.PRINCIPAL and ownership.is_active and not ownership.is_deleted and ownership.persona
-            ),
-            None,
-        )
+        owner = get_primary_owner_for_parcel(parcel)
         setattr(parcel, '_map_cached_primary_owner', owner)
         return owner
 
@@ -193,15 +179,7 @@ class ParcelOptionSerializer(serializers.ModelSerializer):
         fields = ['id', 'parcel_code', 'full_name', 'rut']
 
     def _primary_owner(self, obj):
-        ownerships = obj.ownerships.all()
-        return next(
-            (
-                ownership.persona
-                for ownership in ownerships
-                if ownership.tipo == OwnershipType.PRINCIPAL and ownership.is_active and not ownership.is_deleted and ownership.persona
-            ),
-            None,
-        )
+        return get_primary_owner_for_parcel(obj)
 
     def get_full_name(self, obj):
         person = self._primary_owner(obj)

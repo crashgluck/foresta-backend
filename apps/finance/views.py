@@ -4,6 +4,8 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+from django.conf import settings
+from django.core.cache import cache
 from django.db.models import Q, Count, Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
@@ -13,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import UserActorType, UserRole
+from apps.core.cache_utils import request_cache_key
 from apps.core.permissions import RoleBasedActionPermission
 from apps.finance.models import (
     CommonExpenseDebt,
@@ -116,6 +119,12 @@ class FinanceSummaryView(APIView):
         parcel_id = request.query_params.get("parcel")
         date_from = _parse_date(request.query_params.get("date_from"))
         date_to = _parse_date(request.query_params.get("date_to"))
+        cache_timeout = settings.FINANCE_SUMMARY_CACHE_SECONDS
+        cache_key = request_cache_key("finance:summary", request)
+        if cache_timeout:
+            cached_payload = cache.get(cache_key)
+            if cached_payload is not None:
+                return Response(cached_payload)
 
         debt_filters = {}
         movement_filters = {}
@@ -216,22 +225,23 @@ class FinanceSummaryView(APIView):
             {"label": "Multas", "value": _to_money(fines_total)},
         ]
 
-        return Response(
-            {
-                "kpis": {
-                    "debt_total": _to_money(debt_total),
-                    "debt_overdue_total": _to_money(debt_overdue_total),
-                    "payments_month_amount": _to_money(payments_month_amount),
-                    "payments_month_count": payments_month_count,
-                    "agreements_active_count": agreements_active_count,
-                    "fines_pending_count": fines_pending_count,
-                },
-                "charts": {
-                    "monthly_trend": monthly_trend,
-                    "debt_distribution": debt_distribution,
-                },
-            }
-        )
+        payload = {
+            "kpis": {
+                "debt_total": _to_money(debt_total),
+                "debt_overdue_total": _to_money(debt_overdue_total),
+                "payments_month_amount": _to_money(payments_month_amount),
+                "payments_month_count": payments_month_count,
+                "agreements_active_count": agreements_active_count,
+                "fines_pending_count": fines_pending_count,
+            },
+            "charts": {
+                "monthly_trend": monthly_trend,
+                "debt_distribution": debt_distribution,
+            },
+        }
+        if cache_timeout:
+            cache.set(cache_key, payload, timeout=cache_timeout)
+        return Response(payload)
 
 
 class FinanceConsolidatedPagination(PageNumberPagination):

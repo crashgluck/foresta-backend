@@ -3,6 +3,7 @@ from rest_framework import viewsets
 from apps.access_control.models import AccessRecord, BlacklistEntry
 from apps.access_control.serializers import AccessRecordSerializer, BlacklistEntrySerializer
 from apps.accounts.models import UserActorType, UserRole
+from apps.core.parcel_display import primary_owner_prefetch
 from apps.core.permissions import RoleBasedActionPermission
 
 
@@ -28,9 +29,7 @@ class BlacklistEntryViewSet(viewsets.ModelViewSet):
 
 
 class AccessRecordViewSet(viewsets.ModelViewSet):
-    queryset = AccessRecord.objects.select_related('parcela', 'persona', 'created_by', 'updated_by').prefetch_related(
-        'parcela__ownerships__persona'
-    )
+    queryset = AccessRecord.objects.select_related('parcela', 'persona', 'created_by', 'updated_by').prefetch_related(primary_owner_prefetch())
     serializer_class = AccessRecordSerializer
     permission_classes = [RoleBasedActionPermission]
     search_fields = ['full_name', 'rut', 'plate', 'motive', 'company_name', 'parcela__codigo_parcela', 'persona__nombre_completo']

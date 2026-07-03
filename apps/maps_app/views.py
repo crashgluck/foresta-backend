@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Count, Prefetch
 from django.utils import timezone
@@ -9,6 +10,8 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import UserRole
 from apps.access_control.models import AccessRecord
+from apps.core.cache_utils import request_cache_key
+from apps.core.parcel_display import primary_owner_prefetch
 from apps.core.permissions import RoleBasedActionPermission, has_role_at_least
 from apps.maps_app.models import Objective, ParcelMapGeometry, Visit
 from apps.maps_app.serializers import ObjectiveSerializer, ParcelMapItemSerializer, ParcelOptionSerializer, VisitSerializer
@@ -17,7 +20,7 @@ from apps.people.models import OwnershipType, ParcelOwnership
 
 
 class ObjectiveViewSet(viewsets.ModelViewSet):
-    queryset = Objective.objects.select_related('parcela', 'persona', 'assigned_to').prefetch_related('parcela__ownerships__persona')
+    queryset = Objective.objects.select_related('parcela', 'persona', 'assigned_to').prefetch_related(primary_owner_prefetch())
     serializer_class = ObjectiveSerializer
     permission_classes = [RoleBasedActionPermission]
     search_fields = ['title', 'description', 'parcela__codigo_parcela', 'persona__nombre_completo']
@@ -42,7 +45,7 @@ class ObjectiveViewSet(viewsets.ModelViewSet):
 
 
 class VisitViewSet(viewsets.ModelViewSet):
-    queryset = Visit.objects.select_related('parcela', 'persona', 'objective', 'admitted_by').prefetch_related('parcela__ownerships__persona')
+    queryset = Visit.objects.select_related('parcela', 'persona', 'objective', 'admitted_by').prefetch_related(primary_owner_prefetch())
     serializer_class = VisitSerializer
     permission_classes = [RoleBasedActionPermission]
     search_fields = ['visitor_name', 'visitor_rut', 'vehicle_plate', 'purpose', 'parcela__codigo_parcela']
@@ -71,9 +74,10 @@ class OwnersMapView(APIView):
 
         include_inactive = request.query_params.get('include_inactive') == 'true'
         cache_key = f'maps:owners:{int(include_inactive)}'
-        cached_payload = cache.get(cache_key)
-        if cached_payload is not None:
-            return Response(cached_payload)
+        if settings.MAPS_OWNERS_CACHE_SECONDS:
+            cached_payload = cache.get(cache_key)
+            if cached_payload is not None:
+                return Response(cached_payload)
 
         queryset = (
             ParcelMapGeometry.objects.select_related('parcela')
@@ -93,7 +97,8 @@ class OwnersMapView(APIView):
             queryset = queryset.filter(parcela__estado='ACTIVA')
         serializer = ParcelMapItemSerializer(queryset, many=True)
         payload = serializer.data
-        cache.set(cache_key, payload, timeout=30)
+        if settings.MAPS_OWNERS_CACHE_SECONDS:
+            cache.set(cache_key, payload, timeout=settings.MAPS_OWNERS_CACHE_SECONDS)
         return Response(payload)
 
 
@@ -105,6 +110,13 @@ class ParcelVisitSummaryView(APIView):
             return Response({'detail': 'No autorizado'}, status=403)
 
         window = (request.query_params.get('window') or 'all').strip().lower()
+        cache_timeout = settings.MAPS_VISIT_SUMMARY_CACHE_SECONDS
+        cache_key = request_cache_key('maps:visit-summary', request)
+        if cache_timeout:
+            cached_payload = cache.get(cache_key)
+            if cached_payload is not None:
+                return Response(cached_payload)
+
         visits_qs = Visit.objects.select_related('parcela').exclude(parcela_id=None)
         access_qs = AccessRecord.objects.select_related('parcela').exclude(parcela_id=None)
 
@@ -208,6 +220,8 @@ class ParcelVisitSummaryView(APIView):
             )
 
         ordered_summary = sorted(summary.values(), key=lambda item: item['last_visit_datetime'] or timezone.now(), reverse=True)
+        if cache_timeout:
+            cache.set(cache_key, ordered_summary, timeout=cache_timeout)
         return Response(ordered_summary)
 
 
@@ -219,8 +233,18 @@ class ParcelOptionsView(APIView):
             return Response({'detail': 'No autorizado'}, status=403)
 
         include_inactive = request.query_params.get('include_inactive') == 'true'
-        queryset = Parcel.objects.prefetch_related('ownerships__persona').all()
+        cache_timeout = settings.MAPS_OPTIONS_CACHE_SECONDS
+        cache_key = request_cache_key('maps:parcel-options', request)
+        if cache_timeout:
+            cached_payload = cache.get(cache_key)
+            if cached_payload is not None:
+                return Response(cached_payload)
+
+        queryset = Parcel.objects.prefetch_related(primary_owner_prefetch('ownerships')).all()
         if not include_inactive:
             queryset = queryset.filter(estado='ACTIVA')
         serializer = ParcelOptionSerializer(queryset, many=True)
-        return Response(serializer.data)
+        payload = serializer.data
+        if cache_timeout:
+            cache.set(cache_key, payload, timeout=cache_timeout)
+        return Response(payload)
