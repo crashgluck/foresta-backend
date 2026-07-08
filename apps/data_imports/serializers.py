@@ -41,6 +41,10 @@ class ImportJobSerializer(serializers.ModelSerializer):
         return ImportRowResultSerializer(queryset, many=True).data
 
     def get_summary(self, obj):
+        details_summary = (obj.details or {}).get('summary')
+        if details_summary:
+            return details_summary
+
         sheet_totals = obj.sheet_results.aggregate(rows_read=Sum('rows_read'))
         total_rows_read = sheet_totals['rows_read'] or 0
         action_counts = {

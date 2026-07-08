@@ -1,9 +1,11 @@
 import os
 import tempfile
 
+from django.core.management import call_command
 from django.test import TestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
 from openpyxl import Workbook
+from openpyxl.styles import PatternFill
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import User, UserRole
@@ -11,6 +13,7 @@ from apps.core.normalizers import normalize_parcel_code
 from apps.data_imports.models import ImportJob, ImportRowAction, ImportRowResult, ImportStatus
 from apps.data_imports.services.excel_importer import ExcelMasterImporter
 from apps.parcels.models import Parcel
+from apps.people.models import OwnershipType, ParcelOwnership, Person
 
 
 class ImportAndNormalizerTests(TestCase):
@@ -39,6 +42,74 @@ class ImportAndNormalizerTests(TestCase):
         self.assertTrue(job.dry_run)
         self.assertGreaterEqual(job.total_inserted, 1)
         self.assertEqual(Parcel.objects.count(), 0)
+
+    def test_import_ignores_inflated_empty_rows(self):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'ANOTACIONES'
+        ws.append(['PARCELA', 'FECHA', 'ANOTACION/OBSERVACION'])
+        ws.append(['B-01', '2026-07-01', 'Nota real'])
+        ws.cell(row=1000, column=4).fill = PatternFill(fill_type='solid', fgColor='FFFFFF')
+
+        fd, path = tempfile.mkstemp(suffix='.xlsx')
+        os.close(fd)
+        try:
+            wb.save(path)
+            importer = ExcelMasterImporter(file_path=path, dry_run=True, sheets=['ANOTACIONES'], empty_row_break_limit=25)
+            job = importer.run()
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+        sheet_result = job.sheet_results.get(sheet_name='ANOTACIONES')
+        structure = (job.details or {}).get('structure', {})
+        check = next(item for item in structure.get('checks', []) if item['sheet_name'] == 'ANOTACIONES')
+        self.assertEqual(sheet_result.rows_read, 1)
+        self.assertEqual(check['row_count'], 1)
+        self.assertGreater(check['excel_reported_row_count'], check['row_count'])
+
+    def test_import_replaces_existing_primary_owner_for_parcel(self):
+        parcel = Parcel.objects.create(codigo_parcela='B-01')
+        old_person = Person.objects.create(nombre_completo='PROPIETARIO ANTERIOR')
+        old_ownership = ParcelOwnership.objects.create(
+            parcela=parcel,
+            persona=old_person,
+            tipo=OwnershipType.PRINCIPAL,
+            is_active=True,
+        )
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Datos_Propietarios'
+        ws.append(['PARCELA', 'NOMBRE COMPLETO', 'RUT', 'DV', 'TELEFONO', 'EMAIL'])
+        ws.append(['B-01', 'PROPIETARIO NUEVO', '12345678', '', '', 'nuevo@example.com'])
+
+        fd, path = tempfile.mkstemp(suffix='.xlsx')
+        os.close(fd)
+        try:
+            wb.save(path)
+            importer = ExcelMasterImporter(file_path=path, dry_run=False, sheets=['Datos_Propietarios'])
+            job = importer.run()
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+        old_ownership.refresh_from_db()
+        self.assertEqual(job.status, ImportStatus.SUCCESS)
+        self.assertFalse(old_ownership.is_active)
+        self.assertEqual(
+            ParcelOwnership.objects.filter(parcela=parcel, tipo=OwnershipType.PRINCIPAL, is_active=True, is_deleted=False).count(),
+            1,
+        )
+        self.assertTrue(
+            ParcelOwnership.objects.filter(
+                parcela=parcel,
+                persona__nombre_completo='PROPIETARIO NUEVO',
+                tipo=OwnershipType.PRINCIPAL,
+                is_active=True,
+                is_deleted=False,
+            ).exists()
+        )
 
 
 class ImportApiFlowTests(APITestCase):
@@ -82,8 +153,33 @@ class ImportApiFlowTests(APITestCase):
                 data={'upload_session_id': upload_session_id},
                 format='json',
             )
-            self.assertEqual(run_response.status_code, 201)
+            self.assertEqual(run_response.status_code, 202)
             self.assertFalse(run_response.data['job']['dry_run'])
+            self.assertEqual(run_response.data['job']['status'], ImportStatus.PENDING)
+
+            call_command('process_import_jobs', max_jobs=1, max_seconds=30)
+            job = ImportJob.objects.get(id=run_response.data['job']['id'])
+            self.assertEqual(job.status, ImportStatus.SUCCESS)
+            self.assertTrue(Parcel.objects.filter(codigo_parcela_key='B-1').exists())
+        finally:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+    def test_skip_preview_upload_only_creates_upload_session(self):
+        file_path = self._build_workbook_file()
+        try:
+            with open(file_path, 'rb') as fh:
+                response = self.client.post(
+                    '/api/v1/imports/jobs/preview-upload/',
+                    data={'file': fh, 'skip_preview': 'true'},
+                    format='multipart',
+                )
+
+            self.assertEqual(response.status_code, 201)
+            self.assertTrue(response.data['upload_session']['id'])
+            self.assertTrue(response.data['skipped_preview'])
+            self.assertIsNone(response.data['preview_job'])
+            self.assertEqual(ImportJob.objects.count(), 0)
         finally:
             if os.path.exists(file_path):
                 os.remove(file_path)

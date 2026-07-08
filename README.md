@@ -181,6 +181,14 @@ python manage.py seed_initial_data --email admin@example.com --password "ClaveSe
 
 ## 10. Importar Excel maestro
 
+En produccion/cPanel, la API deja las importaciones reales en cola (`PENDING`) y un cron ejecuta el worker:
+
+```bash
+python manage.py process_import_jobs --max-jobs 1 --max-seconds 45
+```
+
+Esto evita que Passenger mantenga una peticion HTTP larga mientras se procesa el Excel.
+
 ### Dry-run (sin persistir)
 
 ```bash
@@ -197,6 +205,12 @@ python manage.py import_maestro --file "C:\ruta\MAESTRO.xlsx"
 
 ```bash
 python manage.py import_maestro --file "C:\ruta\MAESTRO.xlsx" --sheets "Datos_Propietarios,RESIDENTES,PPU_LOGOS"
+```
+
+Hojas recomendadas para actualizacion semanal:
+
+```bash
+python manage.py import_maestro --file "C:\ruta\MAESTRO.xlsx" --sheets "Mora GC,DESUDAS AyS,MORA CONVENIO,Cortes Vigentes,ANOTACIONES,HISTORICO AYS"
 ```
 
 ## 10.1 Importar sistema legacy (frontend/backend anterior)
@@ -232,10 +246,14 @@ python manage.py seed_dashboard_finance --days 120 --truncate
 - Tolerancia a datos incompletos
 - `dry-run` para previsualizar impacto
 - Upsert/actualizacion donde aplica
+- Jobs en cola para produccion/cPanel mediante `process_import_jobs`
+- Corte temprano de filas vacias para evitar hojas Excel con dimensiones infladas
+- Trazabilidad compacta: errores/warnings por fila y resumen agregado para filas exitosas
 - Registro de trazabilidad:
   - `ImportJob`
   - `ImportSheetResult`
   - `ImportIssue`
+  - `ImportRowResult` para errores, advertencias y, si se activa `IMPORT_LOG_SUCCESS_ROWS`, tambien acciones exitosas
 
 Hojas soportadas:
 
@@ -303,6 +321,6 @@ Dashboard:
 
 1. Versionado formal de API (`/api/v2`) cuando haya cambios breaking.
 2. Historial de cambios detallado por entidad (event sourcing ligero o django-simple-history).
-3. Cola asincrona para importaciones pesadas (Celery + Redis).
+3. Celery + Redis solo si mas adelante se migra desde cPanel a un servidor con workers persistentes.
 4. Motor de conciliacion de duplicados de personas con reglas mas avanzadas.
 5. Dashboard con KPIs historicos y alertas proactivas.

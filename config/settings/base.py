@@ -52,7 +52,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'drf_spectacular',
     'django_filters',
-    'apps.core',
+    'apps.core.apps.CoreConfig',
     'apps.accounts',
     'apps.parcels',
     'apps.people',
@@ -108,6 +108,7 @@ ASGI_APPLICATION = 'config.asgi.application'
 DB_ENGINE = os.getenv('DB_ENGINE', 'sqlite').strip().lower()
 DB_CONN_MAX_AGE = env_int('DB_CONN_MAX_AGE', 0, minimum=0)
 DB_CONN_HEALTH_CHECKS = env_bool('DB_CONN_HEALTH_CHECKS', False)
+SQLITE_TIMEOUT_SECONDS = env_int('SQLITE_TIMEOUT_SECONDS', 30, minimum=5, maximum=120)
 
 if DB_ENGINE == 'mysql':
     DATABASES = {
@@ -132,6 +133,9 @@ elif DB_ENGINE == 'sqlite':
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
             'CONN_MAX_AGE': 0,
+            'OPTIONS': {
+                'timeout': SQLITE_TIMEOUT_SECONDS,
+            },
         }
     }
 else:
@@ -186,6 +190,10 @@ NODOTECH_REFRESH_TOKEN_CACHE_SECONDS = int(os.getenv('NODOTECH_REFRESH_TOKEN_CAC
 API_PAGE_SIZE = env_int('API_PAGE_SIZE', 25, minimum=5, maximum=100)
 API_MAX_PAGE_SIZE = env_int('API_MAX_PAGE_SIZE', 50, minimum=API_PAGE_SIZE, maximum=200)
 
+IMPORT_EMPTY_ROW_BREAK_LIMIT = env_int('IMPORT_EMPTY_ROW_BREAK_LIMIT', 150, minimum=25, maximum=2000)
+IMPORT_LOG_SUCCESS_ROWS = env_bool('IMPORT_LOG_SUCCESS_ROWS', False)
+IMPORT_QUEUE_BY_DEFAULT = env_bool('IMPORT_QUEUE_BY_DEFAULT', True)
+
 DASHBOARD_CACHE_SECONDS = env_int('DASHBOARD_CACHE_SECONDS', 0, minimum=0)
 DASHBOARD_MAX_RANGE_DAYS = env_int('DASHBOARD_MAX_RANGE_DAYS', 365, minimum=7, maximum=730)
 FINANCE_SUMMARY_CACHE_SECONDS = env_int('FINANCE_SUMMARY_CACHE_SECONDS', 0, minimum=0)
@@ -194,7 +202,7 @@ MAPS_OPTIONS_CACHE_SECONDS = env_int('MAPS_OPTIONS_CACHE_SECONDS', 0, minimum=0)
 MAPS_VISIT_SUMMARY_CACHE_SECONDS = env_int('MAPS_VISIT_SUMMARY_CACHE_SECONDS', 0, minimum=0)
 
 AUDIT_TRAIL_ENABLED = env_bool('AUDIT_TRAIL_ENABLED', True)
-AUDIT_LOG_READS = env_bool('AUDIT_LOG_READS', True)
+AUDIT_LOG_READS = env_bool('AUDIT_LOG_READS', False)
 AUDIT_LOG_PAYLOAD = env_bool('AUDIT_LOG_PAYLOAD', True)
 AUDIT_LOG_QUERY_PARAMS = env_bool('AUDIT_LOG_QUERY_PARAMS', True)
 AUDIT_MAX_PAYLOAD_BYTES = env_int('AUDIT_MAX_PAYLOAD_BYTES', 12000, minimum=0, maximum=12000)

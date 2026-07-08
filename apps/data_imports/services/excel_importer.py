@@ -9,6 +9,7 @@ from pathlib import Path
 import unicodedata
 from zipfile import BadZipFile
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
@@ -101,15 +102,20 @@ class ExcelMasterImporter:
         initiated_by=None,
         sheets: list[str] | None = None,
         column_mapping: dict | None = None,
+        log_success_rows: bool | None = None,
+        empty_row_break_limit: int | None = None,
     ):
         self.file_path = Path(file_path)
         self.dry_run = dry_run
         self.initiated_by = initiated_by
         self.sheets_filter = {s.strip() for s in sheets} if sheets else None
         self.column_mapping = self._normalize_column_mapping(column_mapping or {})
+        self.log_success_rows = getattr(settings, 'IMPORT_LOG_SUCCESS_ROWS', False) if log_success_rows is None else log_success_rows
+        self.empty_row_break_limit = empty_row_break_limit or getattr(settings, 'IMPORT_EMPTY_ROW_BREAK_LIMIT', 150)
         self._cancel_check_every = 25
         self._operations_since_cancel_check = 0
         self._seen_keys: dict[str, dict[str, int]] = {}
+        self._row_action_counts: dict[str, int] = {}
 
     def _parser_map(self):
         return {
@@ -170,7 +176,8 @@ class ExcelMasterImporter:
                         'required_keywords': required_keywords,
                         'missing_keywords': missing,
                         'header_row': header_row or None,
-                        'row_count': max(ws.max_row - (header_row or 1), 0),
+                        'row_count': self._count_data_rows(ws, (header_row or 1) + 1, max_col=max(headers.values()) if headers else ws.max_column),
+                        'excel_reported_row_count': max(ws.max_row - (header_row or 1), 0),
                         'columns': list(headers.keys()),
                     }
                 )
@@ -187,24 +194,65 @@ class ExcelMasterImporter:
             if should_close_workbook:
                 workbook.close()
 
-    def run(self) -> ImportJob:
+    def run(self, job: ImportJob | None = None) -> ImportJob:
         if not self.file_path.exists():
             raise FileNotFoundError(f'Archivo no encontrado: {self.file_path}')
 
+        source_hash = self._hash_file(self.file_path)
+        self._row_action_counts = {}
         logger.info(
             'Iniciando importacion de maestro Excel: file=%s dry_run=%s user=%s',
             self.file_path.name,
             self.dry_run,
             getattr(self.initiated_by, 'id', None),
         )
-        job = ImportJob.objects.create(
-            source_file=self.file_path.name,
-            source_hash=self._hash_file(self.file_path),
-            source_path=str(self.file_path),
-            dry_run=self.dry_run,
-            status=ImportStatus.RUNNING,
-            initiated_by=self.initiated_by,
-        )
+        if job is None:
+            job = ImportJob.objects.create(
+                source_file=self.file_path.name,
+                source_hash=source_hash,
+                source_path=str(self.file_path),
+                dry_run=self.dry_run,
+                status=ImportStatus.RUNNING,
+                initiated_by=self.initiated_by,
+            )
+        else:
+            job.sheet_results.all().delete()
+            job.issues.all().delete()
+            job.row_results.all().delete()
+            details = dict(job.details or {})
+            details.pop('summary', None)
+            details.pop('fatal_errors', None)
+            job.source_file = job.source_file or self.file_path.name
+            job.source_hash = job.source_hash or source_hash
+            job.source_path = job.source_path or str(self.file_path)
+            job.dry_run = self.dry_run
+            job.status = ImportStatus.RUNNING
+            job.finished_at = None
+            job.total_inserted = 0
+            job.total_updated = 0
+            job.total_skipped = 0
+            job.total_errors = 0
+            job.total_warnings = 0
+            job.details = details
+            if self.initiated_by and not job.initiated_by_id:
+                job.initiated_by = self.initiated_by
+            job.save(
+                update_fields=[
+                    'source_file',
+                    'source_hash',
+                    'source_path',
+                    'dry_run',
+                    'status',
+                    'finished_at',
+                    'total_inserted',
+                    'total_updated',
+                    'total_skipped',
+                    'total_errors',
+                    'total_warnings',
+                    'details',
+                    'initiated_by',
+                ]
+            )
 
         parser_map = self._parser_map()
 
@@ -380,7 +428,9 @@ class ExcelMasterImporter:
         job.total_warnings = max(aggregates['warnings'] or 0, issue_counts.get(IssueSeverity.WARNING, 0))
         job.finished_at = timezone.now()
         cancelled = cancelled or self._is_cancel_requested(job)
-        action_counts = {row['action']: row['total'] for row in job.row_results.values('action').annotate(total=Count('id'))}
+        action_counts = dict(self._row_action_counts)
+        if not action_counts:
+            action_counts = {row['action']: row['total'] for row in job.row_results.values('action').annotate(total=Count('id'))}
         rows_read = aggregates['rows_read'] or 0
         error_rows = job.row_results.filter(action=ImportRowAction.ERROR, row_number__isnull=False).values('sheet_name', 'row_number').distinct().count()
         details = dict(job.details or {})
@@ -480,6 +530,10 @@ class ExcelMasterImporter:
         fields_affected: list | None = None,
         issue_codes: list | None = None,
     ):
+        self._row_action_counts[action] = self._row_action_counts.get(action, 0) + 1
+        if action not in {ImportRowAction.ERROR, ImportRowAction.WARNING} and not self.log_success_rows:
+            return
+
         ImportRowResult.objects.create(
             import_job=job,
             sheet_result=sheet_result,
@@ -536,6 +590,25 @@ class ExcelMasterImporter:
             if all(any(self._header_matches(key, aliases) for key in header_map.keys()) for aliases in required_aliases):
                 return row_idx, header_map
         return 0, {}
+
+    def _iter_data_row_numbers(self, ws, start_row: int, max_col: int | None = None):
+        blank_streak = 0
+        effective_max_col = max_col or ws.max_column
+        for row_number, values in enumerate(
+            ws.iter_rows(min_row=start_row, max_col=effective_max_col, values_only=True),
+            start=start_row,
+        ):
+            if any(value not in (None, '') for value in values):
+                blank_streak = 0
+                yield row_number
+                continue
+
+            blank_streak += 1
+            if blank_streak >= self.empty_row_break_limit:
+                break
+
+    def _count_data_rows(self, ws, start_row: int, max_col: int | None = None) -> int:
+        return sum(1 for _ in self._iter_data_row_numbers(ws, start_row, max_col=max_col))
 
     def _cell(self, ws, row: int, col_map: dict[str, int], *aliases: str):
         for alias in aliases:
@@ -842,12 +915,61 @@ class ExcelMasterImporter:
                 if job and sheet_result:
                     self._row_result(job, sheet_result, row_number, ImportRowAction.SKIPPED, 'Relacion de propietario ya existia.', entity='Propiedad', identifier=str(parcel))
             return
+
+        if tipo == OwnershipType.PRINCIPAL:
+            active_primary = (
+                ParcelOwnership.objects.filter(
+                    parcela=parcel,
+                    tipo=OwnershipType.PRINCIPAL,
+                    is_active=True,
+                    is_deleted=False,
+                )
+                .exclude(persona=person)
+                .first()
+            )
+            if active_primary:
+                if self.dry_run:
+                    counter.updated += 1
+                    if job and sheet_result:
+                        self._row_result(
+                            job,
+                            sheet_result,
+                            row_number,
+                            ImportRowAction.UPDATED,
+                            'Preview: se reemplazaria el propietario principal activo.',
+                            entity='Propiedad',
+                            identifier=str(parcel),
+                        )
+                    return
+                active_primary.is_active = False
+                active_primary.fecha_fin = timezone.now().date()
+                active_primary.save(update_fields=['is_active', 'fecha_fin', 'updated_at'])
+                counter.updated += 1
+                if job and sheet_result:
+                    self._row_result(
+                        job,
+                        sheet_result,
+                        row_number,
+                        ImportRowAction.UPDATED,
+                        'Propietario principal anterior desactivado.',
+                        entity='Propiedad',
+                        identifier=str(parcel),
+                    )
         if self.dry_run:
             counter.inserted += 1
             if job and sheet_result:
                 self._row_result(job, sheet_result, row_number, ImportRowAction.CREATED, 'Preview: se crearia la relacion de propietario.', entity='Propiedad', identifier=str(parcel))
             return
-        ParcelOwnership.objects.create(parcela=parcel, persona=person, tipo=tipo, is_active=True)
+        try:
+            ParcelOwnership.objects.create(parcela=parcel, persona=person, tipo=tipo, is_active=True)
+        except IntegrityError:
+            existing_active = ParcelOwnership.objects.filter(parcela=parcel, persona=person, tipo=tipo, is_deleted=False).first()
+            if existing_active:
+                counter.skipped += 1
+                if job and sheet_result:
+                    self._row_result(job, sheet_result, row_number, ImportRowAction.SKIPPED, 'Relacion de propietario ya existia.', entity='Propiedad', identifier=str(parcel))
+                return
+            raise
         counter.inserted += 1
         if job and sheet_result:
             self._row_result(job, sheet_result, row_number, ImportRowAction.CREATED, 'Relacion de propietario creada.', entity='Propiedad', identifier=str(parcel))
@@ -859,7 +981,7 @@ class ExcelMasterImporter:
             self._issue(job, sheet_result, IssueSeverity.ERROR, ws.title, None, None, 'header_not_found', 'No se encontró encabezado en Datos_Propietarios')
             return
 
-        for row in range(header_row + 1, ws.max_row + 1):
+        for row in self._iter_data_row_numbers(ws, header_row + 1, max_col=max(headers.values())):
             raw_parcel = ''
             try:
                 with transaction.atomic():
@@ -891,7 +1013,7 @@ class ExcelMasterImporter:
                 self._handle_row_exception(job, sheet_result, counter, row, exc, identifier=raw_parcel if 'raw_parcel' in locals() else '')
 
     def _parse_otros_duenos(self, ws, job, sheet_result, counter: Counter):
-        for row in range(2, ws.max_row + 1):
+        for row in self._iter_data_row_numbers(ws, 2, max_col=19):
             parcela = ''
             try:
                 with transaction.atomic():
@@ -930,7 +1052,7 @@ class ExcelMasterImporter:
             self._issue(job, sheet_result, IssueSeverity.WARNING, ws.title, None, None, 'header_not_found', 'No se detectó encabezado en RESIDENTES')
             return
 
-        for row in range(header_row + 1, ws.max_row + 1):
+        for row in self._iter_data_row_numbers(ws, header_row + 1, max_col=max(headers.values())):
             parcela = ''
             try:
                 with transaction.atomic():
@@ -993,7 +1115,7 @@ class ExcelMasterImporter:
             self._issue(job, sheet_result, IssueSeverity.ERROR, ws.title, None, None, 'header_not_found', 'No se detectó encabezado en PPU_LOGOS')
             return
 
-        for row in range(header_row + 1, ws.max_row + 1):
+        for row in self._iter_data_row_numbers(ws, header_row + 1, max_col=max(headers.values())):
             parcela = ''
             ppu = ''
             try:
@@ -1063,7 +1185,7 @@ class ExcelMasterImporter:
             self._issue(job, sheet_result, IssueSeverity.WARNING, ws.title, None, None, 'header_not_found', 'No se detectó encabezado en Mora GC')
             return
 
-        for row in range(header_row + 1, ws.max_row + 1):
+        for row in self._iter_data_row_numbers(ws, header_row + 1, max_col=max(headers.values())):
             parcela = ''
             try:
                 with transaction.atomic():
@@ -1119,7 +1241,7 @@ class ExcelMasterImporter:
             counter.warnings += 1
             return
 
-        for row in range(header_row + 1, ws.max_row + 1):
+        for row in self._iter_data_row_numbers(ws, header_row + 1, max_col=max(headers.values())):
             parcela = ''
             try:
                 with transaction.atomic():
@@ -1185,7 +1307,7 @@ class ExcelMasterImporter:
             counter.warnings += 1
             return
 
-        for row in range(header_row + 1, ws.max_row + 1):
+        for row in self._iter_data_row_numbers(ws, header_row + 1, max_col=max(headers.values())):
             parcela = ''
             try:
                 with transaction.atomic():
@@ -1246,7 +1368,7 @@ class ExcelMasterImporter:
             counter.warnings += 1
             return
 
-        for row in range(header_row + 1, ws.max_row + 1):
+        for row in self._iter_data_row_numbers(ws, header_row + 1, max_col=max(headers.values())):
             parcela = ''
             try:
                 with transaction.atomic():
@@ -1304,7 +1426,7 @@ class ExcelMasterImporter:
             counter.warnings += 1
             return
 
-        for row in range(header_row + 1, ws.max_row + 1):
+        for row in self._iter_data_row_numbers(ws, header_row + 1, max_col=max(headers.values())):
             parcela = ''
             try:
                 with transaction.atomic():
@@ -1378,7 +1500,7 @@ class ExcelMasterImporter:
             counter.warnings += 1
             return
 
-        for row in range(header_row + 1, ws.max_row + 1):
+        for row in self._iter_data_row_numbers(ws, header_row + 1, max_col=max(headers.values())):
             parcela = ''
             try:
                 with transaction.atomic():
@@ -1434,7 +1556,7 @@ class ExcelMasterImporter:
             counter.warnings += 1
             return
 
-        for row in range(header_row + 1, ws.max_row + 1):
+        for row in self._iter_data_row_numbers(ws, header_row + 1, max_col=max(headers.values())):
             parcela = ''
             try:
                 with transaction.atomic():
@@ -1494,7 +1616,7 @@ class ExcelMasterImporter:
             counter.warnings += 1
             return
 
-        for row in range(header_row + 1, ws.max_row + 1):
+        for row in self._iter_data_row_numbers(ws, header_row + 1, max_col=max(headers.values())):
             parcela = ''
             try:
                 with transaction.atomic():

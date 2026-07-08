@@ -1,12 +1,15 @@
 import csv
 import hashlib
 import json
+from pathlib import Path
 import uuid
 
+from django.conf import settings
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.renderers import BaseRenderer
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
@@ -18,6 +21,15 @@ from apps.data_imports.services.excel_importer import ExcelMasterImporter
 
 
 SUPPORTED_EXCEL_EXTENSIONS = ('.xlsx', '.xlsm', '.xltx', '.xltm')
+
+
+class CSVRenderer(BaseRenderer):
+    media_type = 'text/csv'
+    format = 'csv'
+    charset = 'utf-8'
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
 
 
 def _parse_sheets(raw_value):
@@ -70,6 +82,48 @@ def _file_sha256(upload_file) -> str:
         digest.update(chunk)
     upload_file.seek(current_position)
     return digest.hexdigest()
+
+
+def _path_sha256(file_path: str) -> str:
+    digest = hashlib.sha256()
+    with Path(file_path).open('rb') as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _create_pending_import_job(
+    *,
+    file_path: str,
+    dry_run: bool,
+    initiated_by,
+    sheets: list[str] | None,
+    column_mapping: dict,
+    source_file: str | None = None,
+    source_hash: str = '',
+    upload_session_id: str = '',
+) -> ImportJob:
+    path = Path(file_path)
+    if not path.exists():
+        raise FileNotFoundError(f'Archivo no encontrado: {file_path}')
+
+    details = {
+        'execution_mode': 'queued',
+        'selected_sheets': sheets or [],
+        'column_mapping': column_mapping or {},
+    }
+    if upload_session_id:
+        details['upload_session_id'] = upload_session_id
+
+    return ImportJob.objects.create(
+        source_file=source_file or path.name,
+        source_hash=source_hash or _path_sha256(file_path),
+        source_path=str(path),
+        dry_run=dry_run,
+        status=ImportStatus.PENDING,
+        initiated_by=initiated_by,
+        details=details,
+    )
 
 
 def _validate_upload(upload):
@@ -125,6 +179,21 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
             column_mapping = _parse_column_mapping(request.data.get('column_mapping'))
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        queue = _parse_bool(request.data.get('queue'), default=getattr(settings, 'IMPORT_QUEUE_BY_DEFAULT', True) and not dry_run)
+        if queue:
+            try:
+                job = _create_pending_import_job(
+                    file_path=file_path,
+                    dry_run=dry_run,
+                    initiated_by=request.user,
+                    sheets=sheets,
+                    column_mapping=column_mapping,
+                )
+            except FileNotFoundError as exc:
+                return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(ImportJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
+
         importer = ExcelMasterImporter(
             file_path=file_path,
             dry_run=dry_run,
@@ -148,6 +217,7 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         source_hash = _file_sha256(upload)
+        skip_preview = _parse_bool(request.data.get('skip_preview'), default=False)
 
         session = ImportUploadSession.objects.create(
             original_filename=upload.name,
@@ -158,6 +228,19 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
             status=ImportUploadStatus.UPLOADED,
         )
         session.stored_file.save(f'{uuid.uuid4()}_{upload.name}', upload, save=True)
+
+        if skip_preview:
+            return Response(
+                {
+                    'upload_session': ImportUploadSessionSerializer(session).data,
+                    'structure': {},
+                    'preview_job': None,
+                    'preview_issues': [],
+                    'preview_row_results': [],
+                    'skipped_preview': True,
+                },
+                status=status.HTTP_201_CREATED,
+            )
 
         importer = ExcelMasterImporter(
             file_path=session.stored_file.path,
@@ -208,6 +291,31 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         column_mapping = request_mapping or session.column_mapping or {}
 
+        queue = _parse_bool(request.data.get('queue'), default=getattr(settings, 'IMPORT_QUEUE_BY_DEFAULT', True))
+        if queue:
+            try:
+                job = _create_pending_import_job(
+                    file_path=session.stored_file.path,
+                    dry_run=False,
+                    initiated_by=request.user,
+                    sheets=sheets,
+                    column_mapping=column_mapping,
+                    source_file=session.original_filename,
+                    source_hash=session.source_hash,
+                    upload_session_id=str(session.id),
+                )
+            except FileNotFoundError as exc:
+                return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+            session.executed_job = job
+            session.status = ImportUploadStatus.EXECUTED
+            session.selected_sheets = sheets or []
+            session.column_mapping = column_mapping
+            session.save(update_fields=['executed_job', 'status', 'selected_sheets', 'column_mapping', 'last_used_at'])
+
+            job_payload = _job_response_payload(job)
+            return Response({'upload_session': ImportUploadSessionSerializer(session).data, **job_payload}, status=status.HTTP_202_ACCEPTED)
+
         importer = ExcelMasterImporter(
             file_path=session.stored_file.path,
             dry_run=False,
@@ -226,7 +334,7 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
         job_payload = _job_response_payload(job)
         return Response({'upload_session': ImportUploadSessionSerializer(session).data, **job_payload}, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=['get'], url_path='issues-report')
+    @action(detail=True, methods=['get'], url_path='issues-report', renderer_classes=[CSVRenderer])
     def issues_report(self, request, pk=None):
         job = self.get_object()
         issues = job.issues.order_by('sheet_name', 'row_number', 'created_at')

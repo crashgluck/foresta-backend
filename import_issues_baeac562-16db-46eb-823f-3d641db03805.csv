@@ -1,0 +1,72 @@
+severity,sheet_name,row_number,column_name,error_code,message,raw_value,created_at
+ERROR,ANOTACIONES,,,sheet_crash,Error crítico en hoja: database is locked,,2026-07-06T15:40:23.528704-04:00
+ERROR,ANOTACIONES,2,PARCELA,invalid_parcel,Fila rechazada: parcela invalida o ausente.,AGH,2026-07-06T15:40:22.970711-04:00
+ERROR,ANOTACIONES,3,PARCELA,invalid_parcel,Fila rechazada: parcela invalida o ausente.,B,2026-07-06T15:40:22.982239-04:00
+WARNING,ANOTACIONES,6,FECHA,invalid_date,Fecha invalida en FECHA,Antes 2023,2026-07-06T15:40:23.010170-04:00
+WARNING,ANOTACIONES,7,FECHA,invalid_date,Fecha invalida en FECHA,Historico Reclamo,2026-07-06T15:40:23.025271-04:00
+WARNING,ANOTACIONES,8,FECHA,invalid_date,Fecha invalida en FECHA,Historico Reclamo,2026-07-06T15:40:23.039845-04:00
+WARNING,ANOTACIONES,9,FECHA,invalid_date,Fecha invalida en FECHA,Historico Reclamo,2026-07-06T15:40:23.053786-04:00
+WARNING,ANOTACIONES,17,FECHA,invalid_date,Fecha invalida en FECHA,Notificacion,2026-07-06T15:40:23.145729-04:00
+WARNING,ANOTACIONES,18,FECHA,invalid_date,Fecha invalida en FECHA,Notificacion,2026-07-06T15:40:23.162526-04:00
+WARNING,ANOTACIONES,19,FECHA,invalid_date,Fecha invalida en FECHA,Antes 2023,2026-07-06T15:40:23.182161-04:00
+WARNING,ANOTACIONES,21,FECHA,invalid_date,Fecha invalida en FECHA,Historico Reclamo,2026-07-06T15:40:23.210202-04:00
+WARNING,ANOTACIONES,23,FECHA,invalid_date,Fecha invalida en FECHA,Notificacion,2026-07-06T15:40:23.235366-04:00
+WARNING,ANOTACIONES,24,FECHA,invalid_date,Fecha invalida en FECHA,Notificacion,2026-07-06T15:40:23.251820-04:00
+WARNING,ANOTACIONES,25,FECHA,invalid_date,Fecha invalida en FECHA,Notificacion,2026-07-06T15:40:23.268063-04:00
+WARNING,ANOTACIONES,26,FECHA,invalid_date,Fecha invalida en FECHA,Antes 2023,2026-07-06T15:40:23.286763-04:00
+WARNING,ANOTACIONES,27,FECHA,invalid_date,Fecha invalida en FECHA,Historico Reclamo,2026-07-06T15:40:23.307886-04:00
+WARNING,ANOTACIONES,29,FECHA,invalid_date,Fecha invalida en FECHA,Notificacion,2026-07-06T15:40:23.338291-04:00
+WARNING,ANOTACIONES,33,FECHA,invalid_date,Fecha invalida en FECHA,Antes 2023,2026-07-06T15:40:23.439060-04:00
+ERROR,Cortes Vigentes,,,sheet_crash,Error crítico en hoja: database is locked,,2026-07-06T15:40:22.546425-04:00
+ERROR,DESUDAS AyS,,,sheet_crash,Error crítico en hoja: database is locked,,2026-07-06T15:40:21.142146-04:00
+ERROR,DESUDAS AyS,2,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.627369-04:00
+ERROR,DESUDAS AyS,3,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.642111-04:00
+ERROR,DESUDAS AyS,4,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.656923-04:00
+ERROR,DESUDAS AyS,5,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.672002-04:00
+ERROR,DESUDAS AyS,6,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.687195-04:00
+ERROR,DESUDAS AyS,7,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.700776-04:00
+ERROR,DESUDAS AyS,8,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.719235-04:00
+ERROR,DESUDAS AyS,9,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.736708-04:00
+ERROR,DESUDAS AyS,10,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.755134-04:00
+ERROR,DESUDAS AyS,11,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.771825-04:00
+ERROR,DESUDAS AyS,12,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.787104-04:00
+ERROR,DESUDAS AyS,13,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.805914-04:00
+ERROR,DESUDAS AyS,14,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.821672-04:00
+ERROR,DESUDAS AyS,15,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.836481-04:00
+ERROR,DESUDAS AyS,16,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.852343-04:00
+ERROR,DESUDAS AyS,17,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.869249-04:00
+ERROR,DESUDAS AyS,18,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.886187-04:00
+ERROR,DESUDAS AyS,19,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.901448-04:00
+ERROR,DESUDAS AyS,20,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.916583-04:00
+ERROR,DESUDAS AyS,21,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.941583-04:00
+ERROR,DESUDAS AyS,22,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.957413-04:00
+ERROR,DESUDAS AyS,23,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:20.990073-04:00
+ERROR,DESUDAS AyS,24,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:21.012815-04:00
+ERROR,DESUDAS AyS,25,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:21.036720-04:00
+ERROR,DESUDAS AyS,26,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:21.060380-04:00
+ERROR,DESUDAS AyS,27,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:21.084846-04:00
+ERROR,DESUDAS AyS,28,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:21.098638-04:00
+ERROR,DESUDAS AyS,29,TOTAL DEUDA,invalid_decimal,Valor numerico invalido en TOTAL DEUDA,Pedir Finanzas,2026-07-06T15:40:21.117555-04:00
+ERROR,Datos_Propietarios,,,sheet_crash,Error crítico en hoja: database is locked,,2026-07-06T15:40:17.044868-04:00
+WARNING,Datos_Propietarios,7,EMAIL,invalid_email,Email invalido; se importara sin correo.,altosemunaheventos@gmail.com;alirosanhueza18@gmail.com,2026-07-06T15:40:16.876029-04:00
+WARNING,Datos_Propietarios,8,EMAIL,invalid_email,Email invalido; se importara sin correo.,rmella@larrainvial.com;carlos.atan@cef.cl,2026-07-06T15:40:16.908677-04:00
+WARNING,Datos_Propietarios,9,EMAIL,invalid_email,Email invalido; se importara sin correo.,estradasolis@gmail.com;crestada2@gmail.com,2026-07-06T15:40:16.953996-04:00
+ERROR,HISTORICO AYS,,,sheet_crash,Error crítico en hoja: database is locked,,2026-07-06T15:40:22.909994-04:00
+ERROR,MORA CONVENIO,,,sheet_crash,Error crítico en hoja: database is locked,,2026-07-06T15:40:21.604851-04:00
+ERROR,Mora GC,,,sheet_crash,Error crítico en hoja: database is locked,,2026-07-06T15:40:20.556391-04:00
+ERROR,Multas-Convenios impagas,,,sheet_crash,Error crítico en hoja: database is locked,,2026-07-06T15:40:22.025338-04:00
+WARNING,Multas-Convenios impagas,4,parcela,duplicate_in_file,Identificador duplicado en el Excel: parcela=V-35 ya aparecio en la fila 3.,V-35,2026-07-06T15:40:21.700072-04:00
+WARNING,Multas-Convenios impagas,5,parcela,duplicate_in_file,Identificador duplicado en el Excel: parcela=V-35 ya aparecio en la fila 3.,V-35,2026-07-06T15:40:21.720730-04:00
+WARNING,Multas-Convenios impagas,6,parcela,duplicate_in_file,Identificador duplicado en el Excel: parcela=V-35 ya aparecio en la fila 3.,V-35,2026-07-06T15:40:21.740059-04:00
+WARNING,Multas-Convenios impagas,7,parcela,duplicate_in_file,Identificador duplicado en el Excel: parcela=V-35 ya aparecio en la fila 3.,V-35,2026-07-06T15:40:21.760214-04:00
+WARNING,Multas-Convenios impagas,8,parcela,duplicate_in_file,Identificador duplicado en el Excel: parcela=V-35 ya aparecio en la fila 3.,V-35,2026-07-06T15:40:21.784816-04:00
+WARNING,Multas-Convenios impagas,9,parcela,duplicate_in_file,Identificador duplicado en el Excel: parcela=V-35 ya aparecio en la fila 3.,V-35,2026-07-06T15:40:21.806539-04:00
+WARNING,Multas-Convenios impagas,10,parcela,duplicate_in_file,Identificador duplicado en el Excel: parcela=V-35 ya aparecio en la fila 3.,V-35,2026-07-06T15:40:21.830161-04:00
+WARNING,Multas-Convenios impagas,11,parcela,duplicate_in_file,Identificador duplicado en el Excel: parcela=V-35 ya aparecio en la fila 3.,V-35,2026-07-06T15:40:21.851414-04:00
+WARNING,Multas-Convenios impagas,12,parcela,duplicate_in_file,Identificador duplicado en el Excel: parcela=V-35 ya aparecio en la fila 3.,V-35,2026-07-06T15:40:21.875289-04:00
+ERROR,OBRAS,,,sheet_crash,Error crítico en hoja: database is locked,,2026-07-06T15:40:23.832246-04:00
+ERROR,OTROS DUEÑOS,,,sheet_crash,Error crítico en hoja: database is locked,,2026-07-06T15:40:17.577192-04:00
+WARNING,OTROS DUEÑOS,12,RUT,invalid_rut,RUT invalido; se importara sin digito verificador.,26828999-5,2026-07-06T15:40:17.449196-04:00
+ERROR,PPU_LOGOS,,,sheet_crash,Error crítico en hoja: database is locked,,2026-07-06T15:40:19.734928-04:00
+WARNING,PPU_LOGOS,28,parcela_ppu,duplicate_in_file,Identificador duplicado en el Excel: parcela_ppu=F-03:PCYY57 ya aparecio en la fila 27.,F-03:PCYY57,2026-07-06T15:40:19.442001-04:00
+ERROR,RESIDENTES,,,sheet_crash,Error crítico en hoja: database is locked,,2026-07-06T15:40:18.636804-04:00

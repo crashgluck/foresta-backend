@@ -18,6 +18,9 @@ Usa `.env.example` como base y ajusta credenciales reales. Para hosting comparti
 - `MAPS_OPTIONS_CACHE_SECONDS=120`
 - `MAPS_VISIT_SUMMARY_CACHE_SECONDS=45`
 - `FINANCE_SUMMARY_CACHE_SECONDS=45`
+- `IMPORT_QUEUE_BY_DEFAULT=true`
+- `IMPORT_LOG_SUCCESS_ROWS=false`
+- `IMPORT_EMPTY_ROW_BREAK_LIMIT=150`
 
 ## cPanel / Passenger
 
@@ -35,7 +38,23 @@ En cPanel apunta la app Python al directorio `foresta-backend/`. No uses `runser
 
 - Sirve `/static/` directamente desde Apache/cPanel cuando sea posible.
 - No subas sourcemaps (`*.map`) del frontend al servidor si no necesitas depurar produccion.
-- Evita ejecutar importaciones Excel grandes en horas de uso; hazlas manualmente y de a una.
-- Mantén Swagger/Redoc apagado con `SERVE_API_DOCS=false`.
+- Evita ejecutar importaciones Excel grandes dentro de una peticion web. La API deja jobs en cola y el cron los procesa.
+- Manten Swagger/Redoc apagado con `SERVE_API_DOCS=false`.
 - Si necesitas auditoria completa por unos minutos, activa `AUDIT_LOG_READS=true`, revisa lo necesario y vuelve a `false`.
 
+## Importaciones por cron
+
+Configura un cron de cPanel cada minuto o cada 2 minutos:
+
+```bash
+cd /home/USUARIO/foresta-backend && python manage.py process_import_jobs --max-jobs 1 --max-seconds 45
+```
+
+El endpoint de importacion crea `ImportJob` en estado `PENDING`. El comando toma un job, lo marca `RUNNING` y deja el resultado final en el historial. Esto evita que Passenger/cPanel tenga que mantener viva una peticion larga.
+
+Para una carga manual controlada por SSH todavia puedes usar:
+
+```bash
+python manage.py import_maestro --file "MAESTRO.xlsx" --dry-run
+python manage.py import_maestro --file "MAESTRO.xlsx"
+```
