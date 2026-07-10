@@ -36,7 +36,11 @@ def env_list(name: str, default: str = '') -> list[str]:
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'dev-only-change-this-key-to-a-secure-value-1234567890')
 DEBUG = env_bool('DJANGO_DEBUG', False)
-ALLOWED_HOSTS = env_list('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1')
+ALLOWED_HOSTS = [
+    'api-foresta.aguasyservicioslaz.cl',
+    'localhost',
+    '127.0.0.1',
+]
 SERVE_API_DOCS = env_bool('SERVE_API_DOCS', DEBUG)
 
 INSTALLED_APPS = [
@@ -105,7 +109,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 ASGI_APPLICATION = 'config.asgi.application'
 
-DB_ENGINE = os.getenv('DB_ENGINE', 'sqlite').strip().lower()
+DB_ENGINE = os.getenv('DB_ENGINE', 'mysql').strip().lower()
 DB_CONN_MAX_AGE = env_int('DB_CONN_MAX_AGE', 0, minimum=0)
 DB_CONN_HEALTH_CHECKS = env_bool('DB_CONN_HEALTH_CHECKS', False)
 SQLITE_TIMEOUT_SECONDS = env_int('SQLITE_TIMEOUT_SECONDS', 30, minimum=5, maximum=120)
