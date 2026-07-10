@@ -3,6 +3,7 @@ import secrets
 from django.core.cache import cache
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
@@ -15,6 +16,7 @@ from apps.accounts.serializers import (
     CurrentUserSerializer,
     CustomTokenObtainPairSerializer,
     RegisterSerializer,
+    UserAvatarUploadSerializer,
     UserCreateSerializer,
     UserSerializer,
 )
@@ -30,7 +32,7 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        return Response(CurrentUserSerializer(user).data, status=status.HTTP_201_CREATED)
+        return Response(CurrentUserSerializer(user, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -102,7 +104,32 @@ class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        return Response(CurrentUserSerializer(request.user).data)
+        return Response(CurrentUserSerializer(request.user, context={'request': request}).data)
+
+
+class MeAvatarView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        return self._save_avatar(request)
+
+    def patch(self, request):
+        return self._save_avatar(request)
+
+    def _save_avatar(self, request):
+        serializer = UserAvatarUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        previous_avatar = user.avatar
+        user.avatar = serializer.validated_data['avatar']
+        user.save(update_fields=['avatar', 'updated_at'])
+
+        if previous_avatar and previous_avatar.name != user.avatar.name:
+            previous_avatar.storage.delete(previous_avatar.name)
+
+        return Response(CurrentUserSerializer(user, context={'request': request}).data)
 
 
 class ChangePasswordView(APIView):

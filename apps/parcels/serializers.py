@@ -6,6 +6,7 @@ from apps.finance.serializers import (
     ServiceDebtSerializer,
     UnpaidFineSerializer,
 )
+from apps.access_control.serializers import AccessRecordSerializer
 from apps.notes.serializers import AdministrativeNoteSerializer
 from apps.parcels.models import Parcel
 from apps.people.serializers import ParcelOwnershipSerializer, ParcelResidentSerializer
@@ -47,6 +48,7 @@ class ParcelConsolidatedSerializer(ParcelSerializer):
     service_cuts = ServiceCutSerializer(many=True, read_only=True)
     service_history = ServiceHistorySerializer(many=True, read_only=True)
     notes = AdministrativeNoteSerializer(many=True, read_only=True)
+    access_records = AccessRecordSerializer(many=True, read_only=True)
     work_status = ParcelWorkStatusSerializer(read_only=True)
 
     class Meta(ParcelSerializer.Meta):
@@ -61,6 +63,7 @@ class ParcelConsolidatedSerializer(ParcelSerializer):
             'service_cuts',
             'service_history',
             'notes',
+            'access_records',
             'work_status',
         ]
 

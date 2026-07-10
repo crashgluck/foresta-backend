@@ -55,6 +55,7 @@ class ParcelViewSet(viewsets.ModelViewSet):
                 'service_cuts',
                 'service_history',
                 'notes',
+                'access_records',
             )
         )
 

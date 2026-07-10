@@ -1,6 +1,7 @@
 ﻿from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+import uuid
 
 from apps.accounts.managers import UserManager
 from apps.core.models import TimeStampedModel
@@ -24,6 +25,13 @@ class UserActorType(models.TextChoices):
     ADMIN_SISTEMA = 'ADMIN_SISTEMA', _('Administrador de sistema')
 
 
+def user_avatar_upload_to(instance, filename):
+    extension = (filename.rsplit('.', 1)[-1] if '.' in filename else 'jpg').lower()
+    if extension not in {'jpg', 'jpeg', 'png', 'webp'}:
+        extension = 'jpg'
+    return f'users/avatars/{instance.pk or "user"}-{uuid.uuid4().hex}.{extension}'
+
+
 class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     username = models.CharField(max_length=150, unique=True, null=True, blank=True)
@@ -32,6 +40,7 @@ class User(TimeStampedModel, AbstractBaseUser, PermissionsMixin):
     phone = models.CharField(max_length=30, blank=True)
     role = models.CharField(max_length=20, choices=UserRole.choices, default=UserRole.CONSULTA)
     actor_type = models.CharField(max_length=40, choices=UserActorType.choices, default=UserActorType.CONSULTA_EJECUTIVA)
+    avatar = models.FileField(upload_to=user_avatar_upload_to, blank=True)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 

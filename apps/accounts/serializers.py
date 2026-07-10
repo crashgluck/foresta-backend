@@ -5,6 +5,8 @@ from apps.accounts.models import User, UserActorType, UserRole
 
 
 class UserSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
@@ -16,12 +18,20 @@ class UserSerializer(serializers.ModelSerializer):
             'phone',
             'role',
             'actor_type',
+            'avatar_url',
             'is_active',
             'is_staff',
             'created_at',
             'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_avatar_url(self, obj):
+        if not obj.avatar:
+            return ''
+        request = self.context.get('request')
+        url = obj.avatar.url
+        return request.build_absolute_uri(url) if request else url
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
@@ -70,9 +80,35 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class CurrentUserSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'phone', 'role', 'actor_type', 'is_active']
+        fields = ['id', 'email', 'first_name', 'last_name', 'phone', 'role', 'actor_type', 'avatar_url', 'is_active']
+
+    def get_avatar_url(self, obj):
+        if not obj.avatar:
+            return ''
+        request = self.context.get('request')
+        url = obj.avatar.url
+        return request.build_absolute_uri(url) if request else url
+
+
+class UserAvatarUploadSerializer(serializers.Serializer):
+    avatar = serializers.FileField(write_only=True)
+
+    allowed_content_types = {'image/jpeg', 'image/png', 'image/webp'}
+    allowed_extensions = {'jpg', 'jpeg', 'png', 'webp'}
+    max_size_bytes = 2 * 1024 * 1024
+
+    def validate_avatar(self, value):
+        content_type = getattr(value, 'content_type', '')
+        extension = (value.name.rsplit('.', 1)[-1] if '.' in value.name else '').lower()
+        if content_type not in self.allowed_content_types or extension not in self.allowed_extensions:
+            raise serializers.ValidationError('Solo se permiten imagenes JPG, PNG o WEBP.')
+        if value.size > self.max_size_bytes:
+            raise serializers.ValidationError('La imagen no debe superar 2 MB.')
+        return value
 
 
 class ChangePasswordSerializer(serializers.Serializer):
