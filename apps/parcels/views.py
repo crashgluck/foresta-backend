@@ -2,6 +2,7 @@
 from rest_framework import decorators, response, viewsets
 
 from apps.accounts.models import UserActorType, UserRole
+from apps.core.normalizers import normalize_parcel_code
 from apps.core.permissions import RoleBasedActionPermission
 from apps.parcels.models import Parcel
 from apps.parcels.serializers import ParcelConsolidatedSerializer, ParcelSerializer
@@ -69,7 +70,8 @@ class ParcelViewSet(viewsets.ModelViewSet):
 
     @decorators.action(detail=False, methods=['get'], url_path=r'by-code/(?P<codigo>[^/.]+)/ficha-consolidada')
     def consolidated_by_code(self, request, codigo=None):
-        parcel = self.get_consolidated_queryset().filter(codigo_parcela_key__iexact=(codigo or '').strip().upper()).first()
+        normalized_code = normalize_parcel_code(codigo) or (codigo or '').strip().upper()
+        parcel = self.get_consolidated_queryset().filter(codigo_parcela_key__iexact=normalized_code).first()
         if not parcel:
             return response.Response({'detail': 'Parcela no encontrada'}, status=404)
         serializer = ParcelConsolidatedSerializer(parcel)

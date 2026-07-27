@@ -1,7 +1,10 @@
 import os
+import io
+import shutil
 import tempfile
 
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
 from openpyxl import Workbook
@@ -110,6 +113,65 @@ class ImportAndNormalizerTests(TestCase):
                 is_deleted=False,
             ).exists()
         )
+
+    def test_weekly_maestro_import_auto_runs_preview_then_commit(self):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Datos_Propietarios'
+        ws.append(['PARCELA', 'NOMBRE COMPLETO', 'RUT', 'DV', 'TELEFONO', 'EMAIL'])
+        ws.append(['B-01', 'JUAN PEREZ', '12345678', '5', '912345678', 'juan@example.com'])
+
+        fd, path = tempfile.mkstemp(suffix='.xlsx')
+        os.close(fd)
+        report_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, report_dir, ignore_errors=True)
+        out = io.StringIO()
+        try:
+            wb.save(path)
+            call_command(
+                'weekly_maestro_import',
+                file=path,
+                mode='auto',
+                sheets='Datos_Propietarios',
+                report_dir=report_dir,
+                stdout=out,
+            )
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+        self.assertTrue(Parcel.objects.filter(codigo_parcela_key='B-1').exists())
+        self.assertEqual(ImportJob.objects.filter(source_file=os.path.basename(path)).count(), 2)
+        self.assertTrue(os.listdir(report_dir))
+
+    def test_weekly_maestro_import_auto_stops_when_preview_exceeds_errors(self):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Mora GC'
+        ws.append(['PARCELA', 'MORA CG UF', 'TOTAL PESOS'])
+        ws.append(['B-01', '1,5', 'no-es-numero'])
+
+        fd, path = tempfile.mkstemp(suffix='.xlsx')
+        os.close(fd)
+        report_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, report_dir, ignore_errors=True)
+        try:
+            wb.save(path)
+            with self.assertRaises(CommandError):
+                call_command(
+                    'weekly_maestro_import',
+                    file=path,
+                    mode='auto',
+                    sheets='Mora GC',
+                    report_dir=report_dir,
+                    stdout=io.StringIO(),
+                )
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+        self.assertEqual(ImportJob.objects.filter(dry_run=False).count(), 0)
+        self.assertTrue(os.listdir(report_dir))
 
 
 class ImportApiFlowTests(APITestCase):

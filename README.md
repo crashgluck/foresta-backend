@@ -181,6 +181,21 @@ python manage.py seed_initial_data --email admin@example.com --password "ClaveSe
 
 ## 10. Importar Excel maestro
 
+Para cargas semanales en produccion usar el flujo seguro documentado en
+[`docs/importacion-semanal-maestro.md`](docs/importacion-semanal-maestro.md).
+
+Preview semanal recomendado:
+
+```bash
+python manage.py weekly_maestro_import --file "C:\ruta\MAESTRO.xlsx" --mode preview --profile weekly
+```
+
+Carga semanal segura con preview + commit automatico si no hay errores:
+
+```bash
+python manage.py weekly_maestro_import --file "C:\ruta\MAESTRO.xlsx" --mode auto --profile weekly --max-errors 0
+```
+
 En produccion/cPanel, la API deja las importaciones reales en cola (`PENDING`) y un cron ejecuta el worker:
 
 ```bash
