@@ -1,0 +1,9 @@
+# Eliminar el entorno incompleto
+Remove-Item -Recurse -Force .\venv
+
+# Crear nuevamente el entorno
+python -m venv venv
+
+.\venv\Scripts\Activate.ps1
+
+python manage.py loaddata sqlite_data.json

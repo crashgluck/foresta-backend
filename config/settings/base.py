@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     'apps.works',
     'apps.access_control',
     'apps.maps_app',
+    'apps.geo_operations',
     'apps.acquisitions',
     'apps.missions',
     'apps.supervisor',
@@ -225,7 +226,7 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_FILTER_BACKENDS': (
         'django_filters.rest_framework.DjangoFilterBackend',
-        'rest_framework.filters.SearchFilter',
+        'apps.core.filters.NormalizedSearchFilter',
         'rest_framework.filters.OrderingFilter',
     ),
     'DEFAULT_PAGINATION_CLASS': 'apps.core.pagination.StandardResultsSetPagination',

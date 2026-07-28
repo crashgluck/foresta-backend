@@ -15,6 +15,7 @@ from apps.finance.views import (
     ServiceDebtViewSet,
     UnpaidFineViewSet,
 )
+from apps.geo_operations.views import GeoAssetCategoryViewSet, GeoAssetViewSet
 from apps.maps_app.views import ObjectiveViewSet, OwnersMapView, ParcelOptionsView, ParcelVisitSummaryView, VisitViewSet
 from apps.missions.views import DroneFlightViewSet, MissionReportViewSet, MissionViewSet
 from apps.notes.views import AdministrativeNoteViewSet
@@ -47,6 +48,8 @@ router.register('access/access-records', AccessRecordViewSet, basename='access-r
 router.register('access/blacklist', BlacklistEntryViewSet, basename='access-blacklist')
 router.register('maps/objectives', ObjectiveViewSet, basename='map-objectives')
 router.register('maps/visits', VisitViewSet, basename='map-visits')
+router.register('geo/categories', GeoAssetCategoryViewSet, basename='geo-categories')
+router.register('geo/assets', GeoAssetViewSet, basename='geo-assets')
 router.register('acquisitions/remote-controls', RemoteControlViewSet, basename='remote-controls')
 router.register('acquisitions/rfid-cards', RFIDCardViewSet, basename='rfid-cards')
 router.register('acquisitions/vehicle-logos', VehicleLogoViewSet, basename='vehicle-logos')

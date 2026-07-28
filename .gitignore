@@ -7,6 +7,8 @@ __pycache__/
 *.log
 .env
 media/
+backups/
+reports/
 staticfiles/
 .pytest_cache/
 .coverage
