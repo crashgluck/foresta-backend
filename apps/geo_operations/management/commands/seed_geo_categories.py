@@ -16,6 +16,7 @@ class Command(BaseCommand):
                 defaults={
                     'name': row['name'],
                     'description': row['description'],
+                    'service_type': row.get('service_type', 'GENERAL'),
                     'geometry_type': row['geometry_type'],
                     'color': row['color'],
                     'icon': row['icon'],

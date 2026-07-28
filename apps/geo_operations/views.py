@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, Q
-from rest_framework import decorators, exceptions, response, status, viewsets
+from rest_framework import decorators, exceptions, parsers, response, status, viewsets
 
 from apps.accounts.models import UserRole
 from apps.core.permissions import RoleBasedActionPermission
@@ -28,7 +28,7 @@ class GeoAssetCategoryViewSet(viewsets.ModelViewSet):
     serializer_class = GeoAssetCategorySerializer
     permission_classes = [RoleBasedActionPermission]
     search_fields = ['name', 'slug', 'description']
-    filterset_fields = ['geometry_type', 'is_active']
+    filterset_fields = ['geometry_type', 'service_type', 'is_active']
     ordering_fields = ['sort_order', 'name', 'created_at']
 
     required_roles_per_action = {
@@ -44,6 +44,7 @@ class GeoAssetCategoryViewSet(viewsets.ModelViewSet):
 class GeoAssetViewSet(viewsets.ModelViewSet):
     serializer_class = GeoAssetSerializer
     permission_classes = [RoleBasedActionPermission]
+    parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
     search_fields = ['title', 'code', 'description', 'observations', 'category__name', 'parcela__codigo_parcela']
     filterset_fields = ['category', 'geometry_type', 'operational_status', 'criticality', 'is_active', 'parcela']
     ordering_fields = ['title', 'created_at', 'updated_at', 'last_inspection_date', 'criticality']
@@ -84,6 +85,7 @@ class GeoAssetViewSet(viewsets.ModelViewSet):
 
         for query_param, field_name in [
             ('geometry_type', 'geometry_type'),
+            ('service_type', 'category__service_type'),
             ('status', 'operational_status'),
             ('operational_status', 'operational_status'),
             ('criticality', 'criticality'),
@@ -143,7 +145,7 @@ class GeoAssetViewSet(viewsets.ModelViewSet):
     @decorators.action(detail=False, methods=['get'])
     def map(self, request):
         queryset = self.filter_queryset(self.get_queryset())[:1000]
-        serializer = GeoAssetMapSerializer(queryset, many=True)
+        serializer = GeoAssetMapSerializer(queryset, many=True, context={'request': request})
         return response.Response(serializer.data)
 
     @decorators.action(detail=False, methods=['get'])

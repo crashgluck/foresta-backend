@@ -6,11 +6,26 @@ from apps.core.models import BaseDomainModel
 from apps.geo_operations.services.geometry import validate_geojson_geometry
 
 
+def geo_asset_photo_upload_to(instance, filename):
+    return f'geo/assets/photos/{filename}'
+
+
 class GeoGeometryType(models.TextChoices):
     POINT = 'POINT', 'Punto'
     LINE = 'LINE', 'Linea'
     POLYGON = 'POLYGON', 'Poligono'
     ANY = 'ANY', 'Cualquiera'
+
+
+class GeoServiceType(models.TextChoices):
+    ELECTRIC = 'ELECTRIC', 'Servicio electrico'
+    WATER = 'WATER', 'Servicio de aguas'
+    SECURITY = 'SECURITY', 'Seguridad'
+    ROADS = 'ROADS', 'Vialidad'
+    GREEN_AREAS = 'GREEN_AREAS', 'Areas verdes'
+    RISK = 'RISK', 'Riesgos'
+    INSPECTION = 'INSPECTION', 'Inspeccion en terreno'
+    GENERAL = 'GENERAL', 'General'
 
 
 class GeoAssetStatus(models.TextChoices):
@@ -32,6 +47,7 @@ class GeoAssetCategory(BaseDomainModel):
     name = models.CharField(max_length=120)
     slug = models.SlugField(max_length=140, unique=True)
     description = models.TextField(blank=True)
+    service_type = models.CharField(max_length=30, choices=GeoServiceType.choices, default=GeoServiceType.GENERAL, db_index=True)
     geometry_type = models.CharField(max_length=20, choices=GeoGeometryType.choices, default=GeoGeometryType.ANY, db_index=True)
     color = models.CharField(max_length=9, default='#2563eb')
     icon = models.CharField(max_length=80, blank=True)
@@ -77,6 +93,12 @@ class GeoAsset(BaseDomainModel):
     last_inspection_date = models.DateField(null=True, blank=True)
     observations = models.TextField(blank=True)
     parcela = models.ForeignKey('parcels.Parcel', on_delete=models.SET_NULL, null=True, blank=True, related_name='geo_assets')
+    photo = models.FileField(upload_to=geo_asset_photo_upload_to, blank=True)
+    photo_original_name = models.CharField(max_length=255, blank=True)
+    photo_content_type = models.CharField(max_length=80, blank=True)
+    photo_size = models.PositiveIntegerField(default=0)
+    photo_width = models.PositiveIntegerField(default=0)
+    photo_height = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True, db_index=True)
 
     bbox = models.JSONField(default=list, blank=True)

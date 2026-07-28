@@ -5,8 +5,8 @@ from apps.geo_operations.models import GeoAsset, GeoAssetCategory, GeoAssetChang
 
 @admin.register(GeoAssetCategory)
 class GeoAssetCategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'geometry_type', 'color', 'is_active', 'sort_order')
-    list_filter = ('geometry_type', 'is_active')
+    list_display = ('name', 'slug', 'service_type', 'geometry_type', 'color', 'is_active', 'sort_order')
+    list_filter = ('service_type', 'geometry_type', 'is_active')
     search_fields = ('name', 'slug', 'description')
     prepopulated_fields = {'slug': ('name',)}
     ordering = ('sort_order', 'name')
@@ -25,6 +25,9 @@ class GeoAssetAdmin(admin.ModelAdmin):
         'perimeter_m',
         'area_m2',
         'vertex_count',
+        'photo_size',
+        'photo_width',
+        'photo_height',
         'created_by',
         'updated_by',
         'created_at',

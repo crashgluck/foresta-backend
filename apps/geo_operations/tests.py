@@ -1,3 +1,7 @@
+import json
+from io import BytesIO
+
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import User, UserRole
@@ -27,18 +31,21 @@ class GeoOperationsApiTests(APITestCase):
         self.point_category = GeoAssetCategory.objects.create(
             name='Grifos test',
             slug='grifos-test',
+            service_type='SECURITY',
             geometry_type='POINT',
             color='#ef4444',
         )
         self.line_category = GeoAssetCategory.objects.create(
             name='Lineas test',
             slug='lineas-test',
+            service_type='ELECTRIC',
             geometry_type='LINE',
             color='#eab308',
         )
         self.polygon_category = GeoAssetCategory.objects.create(
             name='Zonas test',
             slug='zonas-test',
+            service_type='RISK',
             geometry_type='POLYGON',
             color='#f97316',
         )
@@ -147,6 +154,50 @@ class GeoOperationsApiTests(APITestCase):
         response = self.client.get('/api/v1/geo/assets/map/', {'bbox': '-70.7,-33.5,-70.6,-33.4'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual([row['id'] for row in response.data], [inside.data['id']])
+
+    def test_service_type_filter_returns_matching_assets(self):
+        self._auth_operator()
+        electric = self._create_asset(
+            self.line_category,
+            {'type': 'LineString', 'coordinates': [[-70.66, -33.45], [-70.65, -33.44]]},
+            title='Linea electrica',
+        )
+        self._create_asset(
+            self.point_category,
+            {'type': 'Point', 'coordinates': [-70.66, -33.45]},
+            title='Grifo',
+        )
+
+        response = self.client.get('/api/v1/geo/assets/map/', {'service_type': 'ELECTRIC'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([row['id'] for row in response.data], [electric.data['id']])
+
+    def test_create_point_with_photo_upload_converts_image(self):
+        from PIL import Image
+
+        self._auth_operator()
+        image_buffer = BytesIO()
+        Image.new('RGB', (80, 60), '#ef4444').save(image_buffer, format='JPEG')
+        image_buffer.seek(0)
+        upload = SimpleUploadedFile('terreno.jpg', image_buffer.read(), content_type='image/jpeg')
+
+        response = self.client.post(
+            '/api/v1/geo/assets/',
+            {
+                'title': 'Registro con foto',
+                'category': str(self.point_category.id),
+                'geometry': json.dumps({'type': 'Point', 'coordinates': [-70.66, -33.45]}),
+                'operational_status': 'ACTIVE',
+                'criticality': 'LOW',
+                'photo_upload': upload,
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertTrue(response.data['photo_url'])
+        self.assertEqual(response.data['photo_original_name'], 'terreno.jpg')
+        self.assertGreater(response.data['photo_size'], 0)
 
     def test_export_kml_and_kmz(self):
         self._auth_operator()
