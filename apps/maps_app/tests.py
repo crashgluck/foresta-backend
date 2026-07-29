@@ -22,6 +22,33 @@ class ParcelMapTests(APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['parcel_code'], 'N-19')
 
+    def test_list_owner_map_parcel_only_hides_person_fields(self):
+        login = self.client.post('/api/v1/auth/login/', {'email': self.user.email, 'password': 'Clave12345'}, format='json')
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
+
+        response = self.client.get('/api/v1/maps/owners-map/?parcel_only=true')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[0]['parcel_code'], 'N-19')
+        self.assertNotIn('first_name', response.data[0])
+        self.assertNotIn('last_name', response.data[0])
+        self.assertNotIn('rut', response.data[0])
+        self.assertNotIn('email', response.data[0])
+        self.assertNotIn('secondary_email', response.data[0])
+        self.assertNotIn('secondary_phone_1', response.data[0])
+        self.assertNotIn('secondary_phone_2', response.data[0])
+
+    def test_parcel_options_parcel_only_hides_person_fields(self):
+        login = self.client.post('/api/v1/auth/login/', {'email': self.user.email, 'password': 'Clave12345'}, format='json')
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
+
+        response = self.client.get('/api/v1/maps/parcel-options/?parcel_only=true')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[0]['parcel_code'], 'N-19')
+        self.assertNotIn('full_name', response.data[0])
+        self.assertNotIn('rut', response.data[0])
+
     def test_visit_summary(self):
         login = self.client.post('/api/v1/auth/login/', {'email': self.user.email, 'password': 'Clave12345'}, format='json')
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")

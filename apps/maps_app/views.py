@@ -14,7 +14,14 @@ from apps.core.cache_utils import request_cache_key
 from apps.core.parcel_display import primary_owner_prefetch
 from apps.core.permissions import RoleBasedActionPermission, has_role_at_least
 from apps.maps_app.models import Objective, ParcelMapGeometry, Visit
-from apps.maps_app.serializers import ObjectiveSerializer, ParcelMapItemSerializer, ParcelOptionSerializer, VisitSerializer
+from apps.maps_app.serializers import (
+    ObjectiveSerializer,
+    ParcelMapItemSerializer,
+    ParcelMapPublicItemSerializer,
+    ParcelCodeOptionSerializer,
+    ParcelOptionSerializer,
+    VisitSerializer,
+)
 from apps.parcels.models import Parcel
 from apps.people.models import OwnershipType, ParcelOwnership
 
@@ -73,16 +80,17 @@ class OwnersMapView(APIView):
             return Response({'detail': 'No autorizado'}, status=403)
 
         include_inactive = request.query_params.get('include_inactive') == 'true'
-        cache_key = f'maps:owners:{int(include_inactive)}'
+        parcel_only = request.query_params.get('parcel_only') == 'true'
+        cache_key = f'maps:owners:{int(include_inactive)}:parcel-only:{int(parcel_only)}'
         if settings.MAPS_OWNERS_CACHE_SECONDS:
             cached_payload = cache.get(cache_key)
             if cached_payload is not None:
                 return Response(cached_payload)
 
-        queryset = (
-            ParcelMapGeometry.objects.select_related('parcela')
-            .prefetch_related(
-                # Para el mapa solo necesitamos el propietario principal activo.
+        queryset = ParcelMapGeometry.objects.select_related('parcela').exclude(coordinates__isnull=True)
+        if not parcel_only:
+            queryset = queryset.prefetch_related(
+                # Para el mapa de propietarios solo necesitamos el propietario principal activo.
                 Prefetch(
                     'parcela__ownerships',
                     queryset=ParcelOwnership.objects.select_related('persona').filter(
@@ -91,11 +99,10 @@ class OwnersMapView(APIView):
                     to_attr='map_primary_ownerships',
                 )
             )
-            .exclude(coordinates__isnull=True)
-        )
         if not include_inactive:
             queryset = queryset.filter(parcela__estado='ACTIVA')
-        serializer = ParcelMapItemSerializer(queryset, many=True)
+        serializer_class = ParcelMapPublicItemSerializer if parcel_only else ParcelMapItemSerializer
+        serializer = serializer_class(queryset, many=True)
         payload = serializer.data
         if settings.MAPS_OWNERS_CACHE_SECONDS:
             cache.set(cache_key, payload, timeout=settings.MAPS_OWNERS_CACHE_SECONDS)
@@ -233,6 +240,7 @@ class ParcelOptionsView(APIView):
             return Response({'detail': 'No autorizado'}, status=403)
 
         include_inactive = request.query_params.get('include_inactive') == 'true'
+        parcel_only = request.query_params.get('parcel_only') == 'true'
         cache_timeout = settings.MAPS_OPTIONS_CACHE_SECONDS
         cache_key = request_cache_key('maps:parcel-options', request)
         if cache_timeout:
@@ -240,10 +248,13 @@ class ParcelOptionsView(APIView):
             if cached_payload is not None:
                 return Response(cached_payload)
 
-        queryset = Parcel.objects.prefetch_related(primary_owner_prefetch('ownerships')).all()
+        queryset = Parcel.objects.all()
+        if not parcel_only:
+            queryset = queryset.prefetch_related(primary_owner_prefetch('ownerships'))
         if not include_inactive:
             queryset = queryset.filter(estado='ACTIVA')
-        serializer = ParcelOptionSerializer(queryset, many=True)
+        serializer_class = ParcelCodeOptionSerializer if parcel_only else ParcelOptionSerializer
+        serializer = serializer_class(queryset, many=True)
         payload = serializer.data
         if cache_timeout:
             cache.set(cache_key, payload, timeout=cache_timeout)

@@ -169,6 +169,35 @@ class ParcelMapItemSerializer(serializers.ModelSerializer):
         return obj.parcela.estado == ParcelStatus.ACTIVA
 
 
+class ParcelMapPublicItemSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source='parcela_id', read_only=True)
+    lote = serializers.CharField(source='parcela.letra_lote', read_only=True)
+    n_lote = serializers.SerializerMethodField()
+    is_active = serializers.SerializerMethodField()
+    parcel_code = serializers.CharField(source='parcela.codigo_parcela', read_only=True)
+
+    class Meta:
+        model = ParcelMapGeometry
+        fields = [
+            'id',
+            'parcel_code',
+            'lote',
+            'n_lote',
+            'coordinates',
+            'color',
+            'is_active',
+        ]
+
+    def get_n_lote(self, obj):
+        suffix = obj.parcela.sufijo_lote or ''
+        if obj.parcela.numero_lote is None:
+            return ''
+        return f'{obj.parcela.numero_lote}{suffix}'
+
+    def get_is_active(self, obj):
+        return obj.parcela.estado == ParcelStatus.ACTIVA
+
+
 class ParcelOptionSerializer(serializers.ModelSerializer):
     parcel_code = serializers.CharField(source='codigo_parcela', read_only=True)
     full_name = serializers.SerializerMethodField()
@@ -188,3 +217,11 @@ class ParcelOptionSerializer(serializers.ModelSerializer):
     def get_rut(self, obj):
         person = self._primary_owner(obj)
         return person.rut if person else ''
+
+
+class ParcelCodeOptionSerializer(serializers.ModelSerializer):
+    parcel_code = serializers.CharField(source='codigo_parcela', read_only=True)
+
+    class Meta:
+        model = Parcel
+        fields = ['id', 'parcel_code']
