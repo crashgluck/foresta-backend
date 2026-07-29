@@ -82,3 +82,22 @@ class NodotechIotApiTests(APITestCase):
                 'pulse_ms': 900,
             },
         )
+
+    @override_settings(NODOTECH_DEFAULT_PULSE_MS=900)
+    @patch('apps.iot.views.NodotechClient')
+    def test_operator_can_pulse_relay_without_trailing_slash(self, client_class):
+        self.authenticate(UserRole.OPERADOR)
+        client = Mock()
+        client.command_component.return_value = {'ok': True, 'command_id': 123}
+        client_class.return_value = client
+
+        response = self.client.post('/api/v1/iot/components/7/pulse', {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        client.command_component.assert_called_once_with(
+            7,
+            {
+                'command': 'PULSE_RELAY',
+                'pulse_ms': 900,
+            },
+        )
