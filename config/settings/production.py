@@ -3,6 +3,7 @@ from .base import *
 DEBUG = False
 
 SERVE_API_DOCS = env_bool('SERVE_API_DOCS', False)
+SERVE_MEDIA_FILES = env_bool('SERVE_MEDIA_FILES', True)
 
 SECURE_SSL_REDIRECT = env_bool('SECURE_SSL_REDIRECT', True)
 SESSION_COOKIE_SECURE = env_bool('SESSION_COOKIE_SECURE', True)

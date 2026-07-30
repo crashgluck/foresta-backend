@@ -1,7 +1,10 @@
 import json
 from io import BytesIO
+from tempfile import TemporaryDirectory
+from urllib.parse import urlparse
 
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import User, UserRole
@@ -176,28 +179,37 @@ class GeoOperationsApiTests(APITestCase):
         from PIL import Image
 
         self._auth_operator()
-        image_buffer = BytesIO()
-        Image.new('RGB', (80, 60), '#ef4444').save(image_buffer, format='JPEG')
-        image_buffer.seek(0)
-        upload = SimpleUploadedFile('terreno.jpg', image_buffer.read(), content_type='image/jpeg')
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            image_buffer = BytesIO()
+            Image.new('RGB', (80, 60), '#ef4444').save(image_buffer, format='JPEG')
+            image_buffer.seek(0)
+            upload = SimpleUploadedFile('terreno.jpg', image_buffer.read(), content_type='image/jpeg')
 
-        response = self.client.post(
-            '/api/v1/geo/assets/',
-            {
-                'title': 'Registro con foto',
-                'category': str(self.point_category.id),
-                'geometry': json.dumps({'type': 'Point', 'coordinates': [-70.66, -33.45]}),
-                'operational_status': 'ACTIVE',
-                'criticality': 'LOW',
-                'photo_upload': upload,
-            },
-            format='multipart',
-        )
+            response = self.client.post(
+                '/api/v1/geo/assets/',
+                {
+                    'title': 'Registro con foto',
+                    'category': str(self.point_category.id),
+                    'geometry': json.dumps({'type': 'Point', 'coordinates': [-70.66, -33.45]}),
+                    'operational_status': 'ACTIVE',
+                    'criticality': 'LOW',
+                    'photo_upload': upload,
+                },
+                format='multipart',
+            )
 
-        self.assertEqual(response.status_code, 201, response.data)
-        self.assertTrue(response.data['photo_url'])
-        self.assertEqual(response.data['photo_original_name'], 'terreno.jpg')
-        self.assertGreater(response.data['photo_size'], 0)
+            self.assertEqual(response.status_code, 201, response.data)
+            self.assertTrue(response.data['photo_url'])
+            self.assertEqual(response.data['photo_original_name'], 'terreno.jpg')
+            self.assertGreater(response.data['photo_size'], 0)
+
+            photo_path = urlparse(response.data['photo_url']).path
+            media_response = self.client.get(photo_path)
+            try:
+                self.assertEqual(media_response.status_code, 200)
+                self.assertTrue(media_response['Content-Type'].startswith('image/'))
+            finally:
+                media_response.close()
 
     def test_export_kml_and_kmz(self):
         self._auth_operator()

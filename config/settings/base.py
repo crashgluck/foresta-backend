@@ -36,11 +36,7 @@ def env_list(name: str, default: str = '') -> list[str]:
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'dev-only-change-this-key-to-a-secure-value-1234567890')
 DEBUG = env_bool('DJANGO_DEBUG', False)
-ALLOWED_HOSTS = [
-    'api-foresta.aguasyservicioslaz.cl',
-    'localhost',
-    '127.0.0.1',
-]
+ALLOWED_HOSTS = env_list('DJANGO_ALLOWED_HOSTS', 'api-foresta.aguasyservicioslaz.cl,localhost,127.0.0.1')
 SERVE_API_DOCS = env_bool('SERVE_API_DOCS', DEBUG)
 
 INSTALLED_APPS = [
@@ -162,6 +158,7 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+SERVE_MEDIA_FILES = env_bool('SERVE_MEDIA_FILES', DEBUG)
 
 CACHES = {
     'default': {
