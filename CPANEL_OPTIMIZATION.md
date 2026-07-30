@@ -6,6 +6,7 @@ Usa `.env.example` como base y ajusta credenciales reales. Para hosting comparti
 
 - `DJANGO_ENV=production`
 - `DJANGO_DEBUG=false`
+- `SERVE_MEDIA_FILES=true`
 - `DB_ENGINE=mysql`
 - `LOG_LEVEL=WARNING`
 - `API_PAGE_SIZE=20`
@@ -33,6 +34,7 @@ python manage.py collectstatic --noinput
 ```
 
 En cPanel apunta la app Python al directorio `foresta-backend/`. No uses `runserver` en produccion.
+Manten la carpeta `media/` dentro de `foresta-backend/` entre despliegues; ahi se guardan fotos y archivos subidos. Con `SERVE_MEDIA_FILES=true`, Passenger entrega `/media/...` desde esa carpeta cuando no tienes un alias Apache dedicado.
 
 ## Para reducir CPU e I/O
 
