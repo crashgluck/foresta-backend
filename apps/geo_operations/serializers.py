@@ -244,6 +244,7 @@ class GeoAssetMapSerializer(serializers.ModelSerializer):
             'category_service_type',
             'geometry_type',
             'geometry',
+            'properties',
             'operational_status',
             'criticality',
             'parcela',

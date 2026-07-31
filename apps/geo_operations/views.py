@@ -13,6 +13,11 @@ from apps.geo_operations.serializers import (
 )
 from apps.geo_operations.services.geometry import bbox_intersects_filter, parse_bbox
 from apps.geo_operations.services.kml import export_response
+from apps.geo_operations.services.reports import (
+    build_monthly_report_payload,
+    filter_assets_by_task_status,
+    render_monthly_report_pdf,
+)
 
 
 def _csv_values(value):
@@ -55,6 +60,7 @@ class GeoAssetViewSet(viewsets.ModelViewSet):
         'map': UserRole.CONSULTA,
         'choices': UserRole.CONSULTA,
         'export': UserRole.CONSULTA,
+        'monthly_report': UserRole.CONSULTA,
         'create': UserRole.OPERADOR,
         'update': UserRole.OPERADOR,
         'partial_update': UserRole.OPERADOR,
@@ -144,9 +150,19 @@ class GeoAssetViewSet(viewsets.ModelViewSet):
 
     @decorators.action(detail=False, methods=['get'])
     def map(self, request):
-        queryset = self.filter_queryset(self.get_queryset())[:1000]
-        serializer = GeoAssetMapSerializer(queryset, many=True, context={'request': request})
+        queryset = self.filter_queryset(self.get_queryset())
+        assets = filter_assets_by_task_status(queryset[:2000], request.query_params.get('task_status'))[:1000]
+        serializer = GeoAssetMapSerializer(assets, many=True, context={'request': request})
         return response.Response(serializer.data)
+
+    @decorators.action(detail=False, methods=['get'], url_path='monthly-report')
+    def monthly_report(self, request):
+        queryset = self.filter_queryset(self.get_queryset())[:5000]
+        payload = build_monthly_report_payload(queryset, params=request.query_params)
+        file_format = (request.query_params.get('file_format') or '').lower()
+        if file_format == 'pdf':
+            return render_monthly_report_pdf(payload)
+        return response.Response(payload)
 
     @decorators.action(detail=False, methods=['get'])
     def export(self, request):

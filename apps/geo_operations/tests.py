@@ -147,6 +147,7 @@ class GeoOperationsApiTests(APITestCase):
             self.point_category,
             {'type': 'Point', 'coordinates': [-70.66, -33.45]},
             title='Dentro',
+            properties={'monthly_active_lights': 12},
         )
         self._create_asset(
             self.point_category,
@@ -157,6 +158,7 @@ class GeoOperationsApiTests(APITestCase):
         response = self.client.get('/api/v1/geo/assets/map/', {'bbox': '-70.7,-33.5,-70.6,-33.4'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual([row['id'] for row in response.data], [inside.data['id']])
+        self.assertEqual(response.data[0]['properties']['monthly_active_lights'], 12)
 
     def test_service_type_filter_returns_matching_assets(self):
         self._auth_operator()
@@ -174,6 +176,63 @@ class GeoOperationsApiTests(APITestCase):
         response = self.client.get('/api/v1/geo/assets/map/', {'service_type': 'ELECTRIC'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual([row['id'] for row in response.data], [electric.data['id']])
+
+    def test_monthly_report_summarizes_tasks_and_lighting_counts(self):
+        self._auth_operator()
+        lighting_category = GeoAssetCategory.objects.create(
+            name='Luminarias del camino',
+            slug='luminarias-camino-test',
+            service_type='ELECTRIC',
+            geometry_type='POINT',
+            color='#f59e0b',
+            icon='light',
+        )
+        self._create_asset(
+            lighting_category,
+            {'type': 'Point', 'coordinates': [-70.66, -33.45]},
+            title='Luminaria A',
+            properties={
+                'task_status': 'PENDING',
+                'task_month': '2026-07',
+                'monthly_active_lights': 18,
+                'monthly_lights_to_replace': 3,
+            },
+        )
+        self._create_asset(
+            lighting_category,
+            {'type': 'Point', 'coordinates': [-70.65, -33.44]},
+            title='Luminaria B',
+            properties={
+                'task_status': 'DONE',
+                'task_month': '2026-07',
+                'monthly_active_lights': 10,
+                'monthly_lights_to_replace': 1,
+            },
+        )
+        self._create_asset(
+            lighting_category,
+            {'type': 'Point', 'coordinates': [-70.64, -33.43]},
+            title='Luminaria agosto',
+            properties={'task_status': 'PENDING', 'task_month': '2026-08', 'monthly_lights_to_replace': 7},
+        )
+
+        self.client.force_authenticate(self.reader)
+        response = self.client.get('/api/v1/geo/assets/monthly-report/', {'month': '2026-07'})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['summary']['total_assets'], 2)
+        self.assertEqual(response.data['summary']['pending_tasks'], 1)
+        self.assertEqual(response.data['summary']['done_tasks'], 1)
+        self.assertEqual(response.data['summary']['monthly_active_lights'], 28)
+        self.assertEqual(response.data['summary']['monthly_lights_to_replace'], 4)
+
+        pending_response = self.client.get('/api/v1/geo/assets/monthly-report/', {'month': '2026-07', 'task_status': 'PENDING'})
+        self.assertEqual(pending_response.status_code, 200, pending_response.data)
+        self.assertEqual(pending_response.data['summary']['total_assets'], 1)
+
+        pdf_response = self.client.get('/api/v1/geo/assets/monthly-report/', {'month': '2026-07', 'file_format': 'pdf'})
+        self.assertEqual(pdf_response.status_code, 200)
+        self.assertIn('application/pdf', pdf_response['Content-Type'])
+        self.assertTrue(pdf_response.content.startswith(b'%PDF'))
 
     def test_create_point_with_photo_upload_converts_image(self):
         from PIL import Image
