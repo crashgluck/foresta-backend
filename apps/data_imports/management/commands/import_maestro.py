@@ -1,7 +1,7 @@
 ﻿from django.core.management.base import BaseCommand
 
 from apps.accounts.models import User
-from apps.data_imports.services.excel_importer import ExcelMasterImporter
+from apps.data_imports.services.excel_importer import ExcelMasterImporter, EXCEL_IMPORT_PROFILE_SHEETS
 
 
 class Command(BaseCommand):
@@ -10,6 +10,12 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--file', required=True, help='Ruta del archivo Excel')
         parser.add_argument('--dry-run', action='store_true', help='Simula importación sin persistir datos')
+        parser.add_argument(
+            '--profile',
+            choices=sorted([*EXCEL_IMPORT_PROFILE_SHEETS.keys(), 'full']),
+            default='',
+            help='Perfil de hojas a importar. Usa --sheets para sobrescribir.',
+        )
         parser.add_argument('--sheets', default='', help='Lista separada por coma de hojas a importar')
         parser.add_argument('--user-email', default='', help='Email del usuario que ejecuta')
 
@@ -24,6 +30,7 @@ class Command(BaseCommand):
             dry_run=options['dry_run'],
             initiated_by=user,
             sheets=sheets,
+            profile=options['profile'],
         )
         job = importer.run()
 

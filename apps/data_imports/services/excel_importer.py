@@ -79,6 +79,49 @@ GLOBAL_COLUMN_ALIASES = {
 }
 
 
+COMMUNITY_UPDATE_SHEETS = [
+    'Mora GC',
+    'Datos_Propietarios',
+    'OTROS DUEÑOS',
+    'RESIDENTES',
+    'PPU_LOGOS',
+    'ANOTACIONES',
+]
+
+EXCEL_IMPORT_PROFILE_SHEETS = {
+    'weekly': [
+        'Mora GC',
+        'DESUDAS AyS',
+        'MORA CONVENIO',
+        'Cortes Vigentes',
+        'ANOTACIONES',
+        'HISTORICO AYS',
+    ],
+    'owners': ['Datos_Propietarios', 'OTROS DUEÑOS', 'RESIDENTES', 'PPU_LOGOS'],
+    'finance': ['Mora GC', 'DESUDAS AyS', 'MORA CONVENIO', 'Multas-Convenios impagas'],
+    'services': ['Cortes Vigentes', 'HISTORICO AYS', 'ANOTACIONES'],
+    'works': ['OBRAS'],
+    'actualizacion_comunidad': COMMUNITY_UPDATE_SHEETS,
+    'community_update': COMMUNITY_UPDATE_SHEETS,
+}
+
+
+def normalize_import_profile(profile: str | None) -> str:
+    return str(profile or '').strip().lower()
+
+
+def get_import_profile_sheets(profile: str | None) -> list[str] | None:
+    profile_key = normalize_import_profile(profile)
+    if not profile_key:
+        return None
+    if profile_key == 'full':
+        return list(ExcelMasterImporter.SHEET_REQUIREMENTS.keys())
+    if profile_key not in EXCEL_IMPORT_PROFILE_SHEETS:
+        choices = ', '.join(sorted([*EXCEL_IMPORT_PROFILE_SHEETS.keys(), 'full']))
+        raise ValueError(f'Perfil de importacion no soportado: {profile_key}. Perfiles disponibles: {choices}.')
+    return list(EXCEL_IMPORT_PROFILE_SHEETS[profile_key])
+
+
 class ExcelMasterImporter:
     SHEET_REQUIREMENTS = {
         'Datos_Propietarios': ['parcela', 'nombre completo', 'rut'],
@@ -101,6 +144,7 @@ class ExcelMasterImporter:
         dry_run: bool = False,
         initiated_by=None,
         sheets: list[str] | None = None,
+        profile: str | None = None,
         column_mapping: dict | None = None,
         log_success_rows: bool | None = None,
         empty_row_break_limit: int | None = None,
@@ -108,7 +152,9 @@ class ExcelMasterImporter:
         self.file_path = Path(file_path)
         self.dry_run = dry_run
         self.initiated_by = initiated_by
-        self.sheets_filter = {s.strip() for s in sheets} if sheets else None
+        self.import_profile = normalize_import_profile(profile)
+        selected_sheets = sheets or get_import_profile_sheets(self.import_profile)
+        self.sheets_filter = {s.strip() for s in selected_sheets} if selected_sheets else None
         self.column_mapping = self._normalize_column_mapping(column_mapping or {})
         self.log_success_rows = getattr(settings, 'IMPORT_LOG_SUCCESS_ROWS', False) if log_success_rows is None else log_success_rows
         self.empty_row_break_limit = empty_row_break_limit or getattr(settings, 'IMPORT_EMPTY_ROW_BREAK_LIMIT', 150)
@@ -267,6 +313,7 @@ class ExcelMasterImporter:
         details.update(
             {
                 'import_mode': 'preview' if self.dry_run else 'commit',
+                'import_profile': self.import_profile,
                 'selected_sheets': sorted(self.sheets_filter) if self.sheets_filter else [],
                 'structure': structure,
             }
