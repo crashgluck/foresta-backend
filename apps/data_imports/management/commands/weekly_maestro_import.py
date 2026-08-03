@@ -26,6 +26,8 @@ PROFILE_SHEETS = {
     'finance': ['Mora GC', 'DESUDAS AyS', 'MORA CONVENIO', 'Multas-Convenios impagas'],
     'services': ['Cortes Vigentes', 'HISTORICO AYS', 'ANOTACIONES'],
     'works': ['OBRAS'],
+    'actualizacion_comunidad': ['Mora GC', 'Datos_Propietarios', 'OTROS DUEÑOS', 'RESIDENTES', 'PPU_LOGOS', 'ANOTACIONES'],
+    'community_update': ['Mora GC', 'Datos_Propietarios', 'OTROS DUEÑOS', 'RESIDENTES', 'PPU_LOGOS', 'ANOTACIONES'],
     'full': list(ExcelMasterImporter.SHEET_REQUIREMENTS.keys()),
 }
 

@@ -17,7 +17,7 @@ from apps.accounts.models import UserRole
 from apps.core.permissions import RoleBasedActionPermission
 from apps.data_imports.models import ImportIssue, ImportJob, ImportRowResult, ImportStatus, ImportUploadSession, ImportUploadStatus
 from apps.data_imports.serializers import ImportIssueSerializer, ImportJobSerializer, ImportRowResultSerializer, ImportUploadSessionSerializer
-from apps.data_imports.services.excel_importer import ExcelMasterImporter
+from apps.data_imports.services.excel_importer import ExcelMasterImporter, get_import_profile_sheets, normalize_import_profile
 
 
 SUPPORTED_EXCEL_EXTENSIONS = ('.xlsx', '.xlsm', '.xltx', '.xltm')
@@ -40,6 +40,19 @@ def _parse_sheets(raw_value):
     if isinstance(raw_value, str):
         return [item.strip() for item in raw_value.split(',') if item.strip()]
     return None
+
+
+def _parse_profile(raw_value):
+    profile = normalize_import_profile(raw_value)
+    return profile or ''
+
+
+def _resolve_sheets(raw_sheets, raw_profile):
+    sheets = _parse_sheets(raw_sheets)
+    profile = _parse_profile(raw_profile)
+    if sheets:
+        return sheets, profile
+    return get_import_profile_sheets(profile), profile
 
 
 def _parse_column_mapping(raw_value):
@@ -99,6 +112,7 @@ def _create_pending_import_job(
     initiated_by,
     sheets: list[str] | None,
     column_mapping: dict,
+    import_profile: str = '',
     source_file: str | None = None,
     source_hash: str = '',
     upload_session_id: str = '',
@@ -109,6 +123,7 @@ def _create_pending_import_job(
 
     details = {
         'execution_mode': 'queued',
+        'import_profile': import_profile,
         'selected_sheets': sheets or [],
         'column_mapping': column_mapping or {},
     }
@@ -173,7 +188,10 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
         if not file_path:
             return Response({'detail': 'file_path es requerido'}, status=status.HTTP_400_BAD_REQUEST)
 
-        sheets = _parse_sheets(request.data.get('sheets'))
+        try:
+            sheets, import_profile = _resolve_sheets(request.data.get('sheets'), request.data.get('profile'))
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         dry_run = _parse_bool(request.data.get('dry_run', False), default=False)
         try:
             column_mapping = _parse_column_mapping(request.data.get('column_mapping'))
@@ -188,6 +206,7 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
                     dry_run=dry_run,
                     initiated_by=request.user,
                     sheets=sheets,
+                    import_profile=import_profile,
                     column_mapping=column_mapping,
                 )
             except FileNotFoundError as exc:
@@ -199,6 +218,7 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
             dry_run=dry_run,
             initiated_by=request.user,
             sheets=sheets,
+            profile=import_profile,
             column_mapping=column_mapping,
         )
         job = importer.run()
@@ -211,7 +231,10 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
         if upload_error:
             return Response({'detail': upload_error}, status=status.HTTP_400_BAD_REQUEST)
 
-        sheets = _parse_sheets(request.data.get('sheets'))
+        try:
+            sheets, import_profile = _resolve_sheets(request.data.get('sheets'), request.data.get('profile'))
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         try:
             column_mapping = _parse_column_mapping(request.data.get('column_mapping'))
         except ValueError as exc:
@@ -247,6 +270,7 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
             dry_run=True,
             initiated_by=request.user,
             sheets=sheets,
+            profile=import_profile,
             column_mapping=column_mapping,
         )
         try:
@@ -284,7 +308,11 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
         if not session.stored_file:
             return Response({'detail': 'La sesión no tiene archivo asociado.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        sheets = _parse_sheets(request.data.get('sheets')) or session.selected_sheets or None
+        try:
+            request_sheets, import_profile = _resolve_sheets(request.data.get('sheets'), request.data.get('profile'))
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        sheets = request_sheets or session.selected_sheets or None
         try:
             request_mapping = _parse_column_mapping(request.data.get('column_mapping'))
         except ValueError as exc:
@@ -299,6 +327,7 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
                     dry_run=False,
                     initiated_by=request.user,
                     sheets=sheets,
+                    import_profile=import_profile,
                     column_mapping=column_mapping,
                     source_file=session.original_filename,
                     source_hash=session.source_hash,
@@ -321,6 +350,7 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
             dry_run=False,
             initiated_by=request.user,
             sheets=sheets,
+            profile=import_profile,
             column_mapping=column_mapping,
         )
         job = importer.run()

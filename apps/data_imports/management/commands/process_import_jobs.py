@@ -33,12 +33,14 @@ class Command(BaseCommand):
             try:
                 details = job.details or {}
                 selected_sheets = details.get('selected_sheets') or None
+                import_profile = details.get('import_profile') or ''
                 column_mapping = details.get('column_mapping') or {}
                 importer = ExcelMasterImporter(
                     file_path=job.source_path,
                     dry_run=job.dry_run,
                     initiated_by=job.initiated_by,
                     sheets=selected_sheets,
+                    profile=import_profile,
                     column_mapping=column_mapping,
                 )
                 set_current_user(job.initiated_by)

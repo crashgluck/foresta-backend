@@ -246,6 +246,41 @@ class ImportApiFlowTests(APITestCase):
             if os.path.exists(file_path):
                 os.remove(file_path)
 
+    def test_preview_upload_uses_community_update_profile(self):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Datos_Propietarios'
+        ws.append(['PARCELA', 'NOMBRE COMPLETO', 'RUT', 'DV', 'TELEFONO', 'EMAIL'])
+        ws.append(['B-01', 'JUAN PEREZ', '12345678', '5', '912345678', 'juan@example.com'])
+        works = wb.create_sheet('OBRAS')
+        works.append(['PARCELA N', 'CORTAFUEGO', 'LIMPIEZA'])
+        works.append(['B-99', 'SI', 'NO'])
+
+        fd, path = tempfile.mkstemp(suffix='.xlsx')
+        os.close(fd)
+        try:
+            wb.save(path)
+            with open(path, 'rb') as fh:
+                response = self.client.post(
+                    '/api/v1/imports/jobs/preview-upload/',
+                    data={'file': fh, 'profile': 'actualizacion_comunidad'},
+                    format='multipart',
+                )
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+        self.assertEqual(response.status_code, 201)
+        selected_sheets = response.data['upload_session']['selected_sheets']
+        self.assertCountEqual(
+            selected_sheets,
+            ['Mora GC', 'Datos_Propietarios', 'OTROS DUEÑOS', 'RESIDENTES', 'PPU_LOGOS', 'ANOTACIONES'],
+        )
+        processed_sheets = {item['sheet_name'] for item in response.data['preview_job']['sheet_results']}
+        self.assertIn('Datos_Propietarios', processed_sheets)
+        self.assertNotIn('OBRAS', processed_sheets)
+        self.assertEqual(Parcel.objects.count(), 0)
+
     def test_preview_rejects_invalid_column_mapping_json(self):
         file_path = self._build_workbook_file()
         try:
