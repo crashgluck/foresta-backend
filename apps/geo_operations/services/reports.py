@@ -231,7 +231,7 @@ def render_monthly_report_pdf(payload):
         from reportlab.lib.units import cm
         from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
     except ImportError as exc:
-        raise serializers.ValidationError({'detail': 'Instala reportlab para exportar informes PDF.'}) from exc
+        raise serializers.ValidationError({'detail': 'No fue posible preparar el informe PDF.'}) from exc
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -241,7 +241,7 @@ def render_monthly_report_pdf(payload):
         leftMargin=1.4 * cm,
         topMargin=1.2 * cm,
         bottomMargin=1.2 * cm,
-        title='Informe mensual mapa interactivo',
+        title='Informe mensual de instalaciones',
     )
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle('ReportTitle', parent=styles['Title'], textColor=colors.HexColor('#14532d'), spaceAfter=6)
@@ -250,7 +250,7 @@ def render_monthly_report_pdf(payload):
 
     summary = payload['summary']
     story = [
-        Paragraph('Informe mensual mapa interactivo', title_style),
+        Paragraph('Informe mensual de instalaciones', title_style),
         Paragraph(f"Periodo: {payload['period']['label']} ({payload['period']['date_from']} a {payload['period']['date_to']})", subtitle_style),
     ]
 
