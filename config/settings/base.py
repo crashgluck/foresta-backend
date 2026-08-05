@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'apps.access_control',
     'apps.maps_app',
     'apps.geo_operations',
+    'apps.operations',
     'apps.acquisitions',
     'apps.missions',
     'apps.supervisor',

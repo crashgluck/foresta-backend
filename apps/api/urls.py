@@ -19,6 +19,15 @@ from apps.geo_operations.views import GeoAssetCategoryViewSet, GeoAssetViewSet
 from apps.maps_app.views import ObjectiveViewSet, OwnersMapView, ParcelOptionsView, ParcelVisitSummaryView, VisitViewSet
 from apps.missions.views import DroneFlightViewSet, MissionReportViewSet, MissionViewSet
 from apps.notes.views import AdministrativeNoteViewSet
+from apps.operations.views import (
+    OperationAreaViewSet,
+    OperationBlockReasonViewSet,
+    OperationExecutorViewSet,
+    OperationMaintenanceTemplateViewSet,
+    OperationProjectViewSet,
+    OperationTaskTypeViewSet,
+    OperationTaskViewSet,
+)
 from apps.parcels.views import ParcelViewSet
 from apps.people.views import ParcelOwnershipViewSet, ParcelResidentViewSet, PersonViewSet
 from apps.supervisor.views import NotificationFineViewSet, RoundViewSet, ShiftViewSet
@@ -50,6 +59,13 @@ router.register('maps/objectives', ObjectiveViewSet, basename='map-objectives')
 router.register('maps/visits', VisitViewSet, basename='map-visits')
 router.register('geo/categories', GeoAssetCategoryViewSet, basename='geo-categories')
 router.register('geo/assets', GeoAssetViewSet, basename='geo-assets')
+router.register('operations/areas', OperationAreaViewSet, basename='operation-areas')
+router.register('operations/task-types', OperationTaskTypeViewSet, basename='operation-task-types')
+router.register('operations/block-reasons', OperationBlockReasonViewSet, basename='operation-block-reasons')
+router.register('operations/executors', OperationExecutorViewSet, basename='operation-executors')
+router.register('operations/projects', OperationProjectViewSet, basename='operation-projects')
+router.register('operations/maintenance-templates', OperationMaintenanceTemplateViewSet, basename='operation-maintenance-templates')
+router.register('operations/tasks', OperationTaskViewSet, basename='operation-tasks')
 router.register('acquisitions/remote-controls', RemoteControlViewSet, basename='remote-controls')
 router.register('acquisitions/rfid-cards', RFIDCardViewSet, basename='rfid-cards')
 router.register('acquisitions/vehicle-logos', VehicleLogoViewSet, basename='vehicle-logos')
