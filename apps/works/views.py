@@ -2,11 +2,12 @@
 
 from apps.accounts.models import UserRole
 from apps.core.permissions import RoleBasedActionPermission
+from apps.core.viewsets import CachedModelViewSet
 from apps.works.models import ParcelWorkStatus
 from apps.works.serializers import ParcelWorkStatusSerializer
 
 
-class ParcelWorkStatusViewSet(viewsets.ModelViewSet):
+class ParcelWorkStatusViewSet(CachedModelViewSet):
     queryset = ParcelWorkStatus.objects.select_related('parcela').all()
     serializer_class = ParcelWorkStatusSerializer
     permission_classes = [RoleBasedActionPermission]

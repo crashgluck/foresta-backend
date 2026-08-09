@@ -8,9 +8,10 @@ from apps.accounts.models import UserRole
 from apps.audits.models import AuditEventLog, UserSessionLog
 from apps.audits.serializers import AuditEventLogSerializer, UserSessionLogSerializer
 from apps.core.permissions import RoleBasedActionPermission
+from apps.core.viewsets import CachedReadOnlyModelViewSet
 
 
-class UserSessionLogViewSet(viewsets.ReadOnlyModelViewSet):
+class UserSessionLogViewSet(CachedReadOnlyModelViewSet):
     queryset = UserSessionLog.objects.select_related('user').all()
     serializer_class = UserSessionLogSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -24,7 +25,7 @@ class UserSessionLogViewSet(viewsets.ReadOnlyModelViewSet):
     }
 
 
-class AuditEventLogViewSet(viewsets.ReadOnlyModelViewSet):
+class AuditEventLogViewSet(CachedReadOnlyModelViewSet):
     queryset = AuditEventLog.objects.select_related('user').all()
     serializer_class = AuditEventLogSerializer
     permission_classes = [RoleBasedActionPermission]

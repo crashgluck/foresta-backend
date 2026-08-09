@@ -5,9 +5,10 @@ from apps.acquisitions.models import RFIDCard, RemoteControl, VehicleLogo
 from apps.acquisitions.serializers import RFIDCardSerializer, RemoteControlSerializer, VehicleLogoSerializer
 from apps.core.parcel_display import primary_owner_prefetch
 from apps.core.permissions import RoleBasedActionPermission
+from apps.core.viewsets import CachedModelViewSet
 
 
-class RemoteControlViewSet(viewsets.ModelViewSet):
+class RemoteControlViewSet(CachedModelViewSet):
     queryset = RemoteControl.objects.select_related('parcela', 'persona').prefetch_related(primary_owner_prefetch())
     serializer_class = RemoteControlSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -25,7 +26,7 @@ class RemoteControlViewSet(viewsets.ModelViewSet):
     }
 
 
-class RFIDCardViewSet(viewsets.ModelViewSet):
+class RFIDCardViewSet(CachedModelViewSet):
     queryset = RFIDCard.objects.select_related('parcela', 'persona').prefetch_related(primary_owner_prefetch())
     serializer_class = RFIDCardSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -43,7 +44,7 @@ class RFIDCardViewSet(viewsets.ModelViewSet):
     }
 
 
-class VehicleLogoViewSet(viewsets.ModelViewSet):
+class VehicleLogoViewSet(CachedModelViewSet):
     queryset = VehicleLogo.objects.select_related('parcela', 'persona').prefetch_related(primary_owner_prefetch())
     serializer_class = VehicleLogoSerializer
     permission_classes = [RoleBasedActionPermission]

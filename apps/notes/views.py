@@ -2,11 +2,12 @@
 
 from apps.accounts.models import UserRole
 from apps.core.permissions import RoleBasedActionPermission
+from apps.core.viewsets import CachedModelViewSet
 from apps.notes.models import AdministrativeNote
 from apps.notes.serializers import AdministrativeNoteSerializer
 
 
-class AdministrativeNoteViewSet(viewsets.ModelViewSet):
+class AdministrativeNoteViewSet(CachedModelViewSet):
     queryset = AdministrativeNote.objects.select_related('parcela', 'usuario_registra').all()
     serializer_class = AdministrativeNoteSerializer
     permission_classes = [RoleBasedActionPermission]

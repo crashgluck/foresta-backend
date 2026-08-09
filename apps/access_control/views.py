@@ -5,9 +5,10 @@ from apps.access_control.serializers import AccessRecordSerializer, BlacklistEnt
 from apps.accounts.models import UserActorType, UserRole
 from apps.core.parcel_display import primary_owner_prefetch
 from apps.core.permissions import RoleBasedActionPermission
+from apps.core.viewsets import CachedModelViewSet
 
 
-class BlacklistEntryViewSet(viewsets.ModelViewSet):
+class BlacklistEntryViewSet(CachedModelViewSet):
     queryset = BlacklistEntry.objects.all()
     serializer_class = BlacklistEntrySerializer
     permission_classes = [RoleBasedActionPermission]
@@ -28,7 +29,7 @@ class BlacklistEntryViewSet(viewsets.ModelViewSet):
     }
 
 
-class AccessRecordViewSet(viewsets.ModelViewSet):
+class AccessRecordViewSet(CachedModelViewSet):
     queryset = AccessRecord.objects.select_related('parcela', 'persona', 'created_by', 'updated_by').prefetch_related(primary_owner_prefetch())
     serializer_class = AccessRecordSerializer
     permission_classes = [RoleBasedActionPermission]

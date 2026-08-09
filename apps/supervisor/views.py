@@ -8,11 +8,12 @@ from rest_framework.decorators import action
 from apps.accounts.models import UserRole
 from apps.core.parcel_display import primary_owner_prefetch
 from apps.core.permissions import RoleBasedActionPermission
+from apps.core.viewsets import CachedModelViewSet
 from apps.supervisor.models import NotificationFine, Round, Shift
 from apps.supervisor.serializers import NotificationFineSerializer, RoundSerializer, ShiftSerializer
 
 
-class ShiftViewSet(viewsets.ModelViewSet):
+class ShiftViewSet(CachedModelViewSet):
     queryset = Shift.objects.select_related('supervisor').all()
     serializer_class = ShiftSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -30,7 +31,7 @@ class ShiftViewSet(viewsets.ModelViewSet):
     }
 
 
-class RoundViewSet(viewsets.ModelViewSet):
+class RoundViewSet(CachedModelViewSet):
     queryset = Round.objects.select_related('shift', 'guard').all()
     serializer_class = RoundSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -48,7 +49,7 @@ class RoundViewSet(viewsets.ModelViewSet):
     }
 
 
-class NotificationFineViewSet(viewsets.ModelViewSet):
+class NotificationFineViewSet(CachedModelViewSet):
     queryset = NotificationFine.objects.select_related('parcela', 'persona', 'shift').prefetch_related(primary_owner_prefetch())
     serializer_class = NotificationFineSerializer
     permission_classes = [RoleBasedActionPermission]

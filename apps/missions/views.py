@@ -6,11 +6,12 @@ from rest_framework import viewsets
 from apps.accounts.models import UserActorType, UserRole
 from apps.core.parcel_display import primary_owner_prefetch
 from apps.core.permissions import RoleBasedActionPermission
+from apps.core.viewsets import CachedModelViewSet
 from apps.missions.models import DroneFlight, Mission, MissionReport
 from apps.missions.serializers import DroneFlightSerializer, MissionReportSerializer, MissionSerializer
 
 
-class MissionViewSet(viewsets.ModelViewSet):
+class MissionViewSet(CachedModelViewSet):
     queryset = Mission.objects.select_related('parcela', 'persona', 'assigned_to').prefetch_related(primary_owner_prefetch())
     serializer_class = MissionSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -31,7 +32,7 @@ class MissionViewSet(viewsets.ModelViewSet):
     }
 
 
-class DroneFlightViewSet(viewsets.ModelViewSet):
+class DroneFlightViewSet(CachedModelViewSet):
     queryset = DroneFlight.objects.select_related('pilot', 'parcela', 'persona').prefetch_related(primary_owner_prefetch())
     serializer_class = DroneFlightSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -90,7 +91,7 @@ class DroneFlightViewSet(viewsets.ModelViewSet):
         return queryset
 
 
-class MissionReportViewSet(viewsets.ModelViewSet):
+class MissionReportViewSet(CachedModelViewSet):
     queryset = MissionReport.objects.select_related('mission', 'created_by', 'mission__assigned_to')
     serializer_class = MissionReportSerializer
     permission_classes = [RoleBasedActionPermission]

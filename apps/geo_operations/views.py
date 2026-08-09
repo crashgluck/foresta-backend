@@ -4,6 +4,7 @@ from rest_framework import decorators, exceptions, parsers, response, status, vi
 
 from apps.accounts.models import UserRole
 from apps.core.permissions import RoleBasedActionPermission
+from apps.core.viewsets import CachedModelViewSet
 from apps.geo_operations.models import GeoAsset, GeoAssetCategory
 from apps.geo_operations.serializers import (
     GeoAssetCategorySerializer,
@@ -28,7 +29,7 @@ def _csv_values(value):
     return [item.strip() for item in str(value).split(',') if item.strip()]
 
 
-class GeoAssetCategoryViewSet(viewsets.ModelViewSet):
+class GeoAssetCategoryViewSet(CachedModelViewSet):
     queryset = GeoAssetCategory.objects.annotate(assets_count=Count('assets')).all()
     serializer_class = GeoAssetCategorySerializer
     permission_classes = [RoleBasedActionPermission]
@@ -46,7 +47,7 @@ class GeoAssetCategoryViewSet(viewsets.ModelViewSet):
     }
 
 
-class GeoAssetViewSet(viewsets.ModelViewSet):
+class GeoAssetViewSet(CachedModelViewSet):
     serializer_class = GeoAssetSerializer
     permission_classes = [RoleBasedActionPermission]
     parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
