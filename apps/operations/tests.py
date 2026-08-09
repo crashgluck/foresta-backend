@@ -1,13 +1,15 @@
 from datetime import datetime
 from tempfile import TemporaryDirectory
 
+from django.contrib import admin as django_admin
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import User, UserRole
 from apps.geo_operations.models import GeoAsset, GeoAssetCategory
+from apps.operations.admin import OperationTaskAdmin
 from apps.operations.models import (
     OperationArea,
     OperationBlockReason,
@@ -20,6 +22,12 @@ from apps.operations.models import (
     OperationTaskType,
 )
 from apps.parcels.models import Parcel
+
+
+class OperationTaskAdminConfigTests(SimpleTestCase):
+    def test_detected_at_filter_does_not_use_date_hierarchy(self):
+        self.assertIsNone(OperationTaskAdmin.date_hierarchy)
+        self.assertIn(('detected_at', django_admin.DateFieldListFilter), OperationTaskAdmin.list_filter)
 
 
 class OperationsApiTests(APITestCase):
