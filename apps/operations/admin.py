@@ -52,8 +52,8 @@ class OperationTaskBlockInline(admin.TabularInline):
 class OperationTaskAdmin(admin.ModelAdmin):
     list_display = ('code', 'title', 'status', 'priority', 'area', 'task_type', 'detected_at', 'due_at')
     search_fields = ('code', 'title', 'description', 'sector')
-    list_filter = ('status', 'priority', 'area', 'task_type', 'origin')
-    date_hierarchy = 'detected_at'
+    list_filter = ('status', 'priority', 'area', 'task_type', 'origin', ('detected_at', admin.DateFieldListFilter))
+    # date_hierarchy on DateTimeField uses MySQL CONVERT_TZ and fails on hosts without time zone tables.
     inlines = [OperationTaskEvidenceInline, OperationTaskBlockInline]
 
 
