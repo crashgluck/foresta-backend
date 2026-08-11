@@ -2,11 +2,12 @@
 
 from apps.accounts.models import UserRole
 from apps.core.permissions import RoleBasedActionPermission
+from apps.core.viewsets import CachedModelViewSet
 from apps.vehicles.models import Vehicle
 from apps.vehicles.serializers import VehicleSerializer
 
 
-class VehicleViewSet(viewsets.ModelViewSet):
+class VehicleViewSet(CachedModelViewSet):
     queryset = Vehicle.objects.select_related('parcela', 'persona').all()
     serializer_class = VehicleSerializer
     permission_classes = [RoleBasedActionPermission]

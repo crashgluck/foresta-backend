@@ -23,6 +23,7 @@ from apps.accounts.serializers import (
 from apps.audits.models import SessionAction
 from apps.audits.services import create_session_log
 from apps.core.permissions import RoleBasedActionPermission, has_role_at_least
+from apps.core.viewsets import CachedModelViewSet
 
 
 class RegisterView(APIView):
@@ -207,7 +208,7 @@ class PasswordResetConfirmView(APIView):
         return Response({'detail': 'Contrasena restablecida correctamente.'})
 
 
-class UserViewSet(viewsets.ModelViewSet):
+class UserViewSet(CachedModelViewSet):
     queryset = User.objects.all().order_by('-created_at')
     permission_classes = [permissions.IsAuthenticated, RoleBasedActionPermission]
     search_fields = ['email', 'first_name', 'last_name', 'username']

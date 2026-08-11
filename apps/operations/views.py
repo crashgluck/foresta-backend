@@ -5,6 +5,7 @@ from rest_framework import decorators, parsers, response, status, viewsets
 
 from apps.accounts.models import UserRole
 from apps.core.permissions import RoleBasedActionPermission
+from apps.core.viewsets import CachedModelViewSet
 from apps.operations.filters import OperationTaskFilter
 from apps.operations.models import (
     OperationArea,
@@ -51,7 +52,7 @@ from apps.operations.services.reports import build_report_payload, build_summary
 from apps.operations.services.transitions import assign_task, create_history, reopen_task, transition_task, verify_task
 
 
-class OperationCatalogViewSet(viewsets.ModelViewSet):
+class OperationCatalogViewSet(CachedModelViewSet):
     permission_classes = [RoleBasedActionPermission]
     required_roles_per_action = {
         'list': UserRole.CONSULTA,
@@ -87,7 +88,7 @@ class OperationBlockReasonViewSet(OperationCatalogViewSet):
     serializer_class = OperationBlockReasonSerializer
 
 
-class OperationExecutorViewSet(viewsets.ModelViewSet):
+class OperationExecutorViewSet(CachedModelViewSet):
     serializer_class = OperationExecutorSerializer
     permission_classes = [RoleBasedActionPermission]
     search_fields = ['name', 'contact', 'notes', 'user__email']
@@ -113,7 +114,7 @@ class OperationExecutorViewSet(viewsets.ModelViewSet):
         serializer.save(updated_by=self.request.user)
 
 
-class OperationProjectViewSet(viewsets.ModelViewSet):
+class OperationProjectViewSet(CachedModelViewSet):
     serializer_class = OperationProjectSerializer
     permission_classes = [RoleBasedActionPermission]
     search_fields = ['name', 'description', 'responsible__email', 'responsible__first_name', 'responsible__last_name']
@@ -146,7 +147,7 @@ class OperationProjectViewSet(viewsets.ModelViewSet):
         serializer.save(updated_by=self.request.user)
 
 
-class OperationMaintenanceTemplateViewSet(viewsets.ModelViewSet):
+class OperationMaintenanceTemplateViewSet(CachedModelViewSet):
     serializer_class = OperationMaintenanceTemplateSerializer
     permission_classes = [RoleBasedActionPermission]
     search_fields = ['name', 'description', 'sector', 'geo_asset__title', 'parcela__codigo_parcela']
@@ -175,7 +176,7 @@ class OperationMaintenanceTemplateViewSet(viewsets.ModelViewSet):
         serializer.save(updated_by=self.request.user)
 
 
-class OperationTaskViewSet(viewsets.ModelViewSet):
+class OperationTaskViewSet(CachedModelViewSet):
     permission_classes = [RoleBasedActionPermission]
     parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
     filterset_class = OperationTaskFilter

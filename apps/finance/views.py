@@ -17,6 +17,7 @@ from rest_framework.views import APIView
 from apps.accounts.models import UserActorType, UserRole
 from apps.core.cache_utils import request_cache_key
 from apps.core.permissions import RoleBasedActionPermission
+from apps.core.viewsets import CachedModelViewSet
 from apps.finance.models import (
     CommonExpenseDebt,
     FinancialMovement,
@@ -258,6 +259,13 @@ class FinanceConsolidatedView(APIView):
         if not _has_finance_access(request.user):
             return Response({"detail": "No autorizado"}, status=403)
 
+        cache_timeout = settings.FINANCE_CONSOLIDATED_CACHE_SECONDS
+        cache_key = request_cache_key("finance:consolidated", request)
+        if cache_timeout:
+            cached_payload = cache.get(cache_key)
+            if cached_payload is not None:
+                return Response(cached_payload)
+
         search = (request.query_params.get("search") or "").strip()
         parcel_filter = (request.query_params.get("parcel") or "").strip()
         status_filter = (request.query_params.get("status") or "").strip().upper()
@@ -281,7 +289,10 @@ class FinanceConsolidatedView(APIView):
 
         parcel_ids = list(parcel_qs.values_list("id", flat=True))
         if not parcel_ids:
-            return Response({"count": 0, "next": None, "previous": None, "results": []})
+            payload = {"count": 0, "next": None, "previous": None, "results": []}
+            if cache_timeout:
+                cache.set(cache_key, payload, timeout=cache_timeout)
+            return Response(payload)
 
         principal_owner_rows = (
             ParcelOwnership.objects.select_related("persona")
@@ -401,17 +412,18 @@ class FinanceConsolidatedView(APIView):
 
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(rows, request, view=self)
-        return Response(
-            {
-                "count": paginator.page.paginator.count,
-                "next": paginator.get_next_link(),
-                "previous": paginator.get_previous_link(),
-                "results": page,
-            }
-        )
+        payload = {
+            "count": paginator.page.paginator.count,
+            "next": paginator.get_next_link(),
+            "previous": paginator.get_previous_link(),
+            "results": page,
+        }
+        if cache_timeout:
+            cache.set(cache_key, payload, timeout=cache_timeout)
+        return Response(payload)
 
 
-class CommonExpenseDebtViewSet(viewsets.ModelViewSet):
+class CommonExpenseDebtViewSet(CachedModelViewSet):
     queryset = CommonExpenseDebt.objects.select_related("parcela", "persona").all()
     serializer_class = CommonExpenseDebtSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -429,7 +441,7 @@ class CommonExpenseDebtViewSet(viewsets.ModelViewSet):
     disallowed_actor_types_per_action = {"*": BLOCKED_ACTOR_TYPES}
 
 
-class ServiceDebtViewSet(viewsets.ModelViewSet):
+class ServiceDebtViewSet(CachedModelViewSet):
     queryset = ServiceDebt.objects.select_related("parcela", "persona").all()
     serializer_class = ServiceDebtSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -447,7 +459,7 @@ class ServiceDebtViewSet(viewsets.ModelViewSet):
     disallowed_actor_types_per_action = {"*": BLOCKED_ACTOR_TYPES}
 
 
-class PaymentAgreementViewSet(viewsets.ModelViewSet):
+class PaymentAgreementViewSet(CachedModelViewSet):
     queryset = PaymentAgreement.objects.select_related("parcela").all()
     serializer_class = PaymentAgreementSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -465,7 +477,7 @@ class PaymentAgreementViewSet(viewsets.ModelViewSet):
     disallowed_actor_types_per_action = {"*": BLOCKED_ACTOR_TYPES}
 
 
-class UnpaidFineViewSet(viewsets.ModelViewSet):
+class UnpaidFineViewSet(CachedModelViewSet):
     queryset = UnpaidFine.objects.select_related("parcela").all()
     serializer_class = UnpaidFineSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -483,7 +495,7 @@ class UnpaidFineViewSet(viewsets.ModelViewSet):
     disallowed_actor_types_per_action = {"*": BLOCKED_ACTOR_TYPES}
 
 
-class FinancialMovementViewSet(viewsets.ModelViewSet):
+class FinancialMovementViewSet(CachedModelViewSet):
     queryset = FinancialMovement.objects.select_related("parcela", "persona").all()
     serializer_class = FinancialMovementSerializer
     permission_classes = [RoleBasedActionPermission]

@@ -4,11 +4,12 @@ from rest_framework import decorators, response, viewsets
 from apps.accounts.models import UserActorType, UserRole
 from apps.core.normalizers import normalize_parcel_code
 from apps.core.permissions import RoleBasedActionPermission
+from apps.core.viewsets import CachedModelViewSet
 from apps.parcels.models import Parcel
 from apps.parcels.serializers import ParcelConsolidatedSerializer, ParcelSerializer
 
 
-class ParcelViewSet(viewsets.ModelViewSet):
+class ParcelViewSet(CachedModelViewSet):
     queryset = Parcel.objects.all()
     serializer_class = ParcelSerializer
     permission_classes = [RoleBasedActionPermission]

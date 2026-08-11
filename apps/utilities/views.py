@@ -2,11 +2,12 @@
 
 from apps.accounts.models import UserRole
 from apps.core.permissions import RoleBasedActionPermission
+from apps.core.viewsets import CachedModelViewSet
 from apps.utilities.models import ServiceCut, ServiceHistory
 from apps.utilities.serializers import ServiceCutSerializer, ServiceHistorySerializer
 
 
-class ServiceCutViewSet(viewsets.ModelViewSet):
+class ServiceCutViewSet(CachedModelViewSet):
     queryset = ServiceCut.objects.select_related('parcela').all()
     serializer_class = ServiceCutSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -24,7 +25,7 @@ class ServiceCutViewSet(viewsets.ModelViewSet):
     }
 
 
-class ServiceHistoryViewSet(viewsets.ModelViewSet):
+class ServiceHistoryViewSet(CachedModelViewSet):
     queryset = ServiceHistory.objects.select_related('parcela').all()
     serializer_class = ServiceHistorySerializer
     permission_classes = [RoleBasedActionPermission]

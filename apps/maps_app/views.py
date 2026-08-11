@@ -10,9 +10,10 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import UserRole
 from apps.access_control.models import AccessRecord
-from apps.core.cache_utils import request_cache_key
+from apps.core.cache_utils import get_api_cache_epoch, request_cache_key
 from apps.core.parcel_display import primary_owner_prefetch
 from apps.core.permissions import RoleBasedActionPermission, has_role_at_least
+from apps.core.viewsets import CachedModelViewSet
 from apps.maps_app.models import Objective, ParcelMapGeometry, Visit
 from apps.maps_app.serializers import (
     ObjectiveSerializer,
@@ -26,7 +27,7 @@ from apps.parcels.models import Parcel
 from apps.people.models import OwnershipType, ParcelOwnership
 
 
-class ObjectiveViewSet(viewsets.ModelViewSet):
+class ObjectiveViewSet(CachedModelViewSet):
     queryset = Objective.objects.select_related('parcela', 'persona', 'assigned_to').prefetch_related(primary_owner_prefetch())
     serializer_class = ObjectiveSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -51,7 +52,7 @@ class ObjectiveViewSet(viewsets.ModelViewSet):
         return queryset
 
 
-class VisitViewSet(viewsets.ModelViewSet):
+class VisitViewSet(CachedModelViewSet):
     queryset = Visit.objects.select_related('parcela', 'persona', 'objective', 'admitted_by').prefetch_related(primary_owner_prefetch())
     serializer_class = VisitSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -81,7 +82,7 @@ class OwnersMapView(APIView):
 
         include_inactive = request.query_params.get('include_inactive') == 'true'
         parcel_only = request.query_params.get('parcel_only') == 'true'
-        cache_key = f'maps:owners:{int(include_inactive)}:parcel-only:{int(parcel_only)}'
+        cache_key = f'maps:owners:v{get_api_cache_epoch()}:{int(include_inactive)}:parcel-only:{int(parcel_only)}'
         if settings.MAPS_OWNERS_CACHE_SECONDS:
             cached_payload = cache.get(cache_key)
             if cached_payload is not None:

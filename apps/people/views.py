@@ -2,11 +2,12 @@
 
 from apps.accounts.models import UserActorType, UserRole
 from apps.core.permissions import RoleBasedActionPermission
+from apps.core.viewsets import CachedModelViewSet
 from apps.people.models import ParcelOwnership, ParcelResident, Person
 from apps.people.serializers import ParcelOwnershipSerializer, ParcelResidentSerializer, PersonSerializer
 
 
-class PersonViewSet(viewsets.ModelViewSet):
+class PersonViewSet(CachedModelViewSet):
     queryset = Person.objects.all().order_by('nombre_completo')
     serializer_class = PersonSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -27,7 +28,7 @@ class PersonViewSet(viewsets.ModelViewSet):
     }
 
 
-class ParcelOwnershipViewSet(viewsets.ModelViewSet):
+class ParcelOwnershipViewSet(CachedModelViewSet):
     queryset = ParcelOwnership.objects.select_related('parcela', 'persona').all()
     serializer_class = ParcelOwnershipSerializer
     permission_classes = [RoleBasedActionPermission]
@@ -47,7 +48,7 @@ class ParcelOwnershipViewSet(viewsets.ModelViewSet):
     }
 
 
-class ParcelResidentViewSet(viewsets.ModelViewSet):
+class ParcelResidentViewSet(CachedModelViewSet):
     queryset = ParcelResident.objects.select_related('parcela', 'persona').all()
     serializer_class = ParcelResidentSerializer
     permission_classes = [RoleBasedActionPermission]
