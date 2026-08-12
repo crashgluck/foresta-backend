@@ -118,6 +118,26 @@ class OperationsApiTests(APITestCase):
         self.assertEqual(task.registered_by_id, self.operator.id)
         self.assertTrue(OperationTaskHistory.objects.filter(task=task, action='created').exists())
 
+    def test_create_task_with_own_line_geometry_records_metrics(self):
+        self._auth_operator()
+        geometry = {'type': 'LineString', 'coordinates': [[-70.66, -33.45], [-70.661, -33.451]]}
+        response = self.client.post(
+            '/api/v1/operations/tasks/',
+            {
+                'title': 'Limpieza de tramo',
+                'task_type': self.task_type.id,
+                'area': self.area.id,
+                'priority': 'MEDIUM',
+                'geometry': geometry,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        task = OperationTask.objects.get(pk=response.data['id'])
+        self.assertEqual(task.geometry_type, 'LINE')
+        self.assertEqual(task.vertex_count, 2)
+        self.assertGreater(task.length_m, 0)
+
     def test_executor_without_user_is_allowed(self):
         self._auth_operator()
         response = self.client.post(

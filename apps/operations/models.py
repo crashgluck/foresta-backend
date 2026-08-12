@@ -278,6 +278,10 @@ class OperationTask(BaseDomainModel):
     max_lat = models.FloatField(null=True, blank=True, db_index=True)
     center_lng = models.FloatField(null=True, blank=True)
     center_lat = models.FloatField(null=True, blank=True)
+    length_m = models.FloatField(default=0)
+    perimeter_m = models.FloatField(default=0)
+    area_m2 = models.FloatField(default=0)
+    vertex_count = models.PositiveIntegerField(default=0)
 
     cost_estimated = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     cost_real = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
@@ -332,6 +336,10 @@ class OperationTask(BaseDomainModel):
             self.bbox = list(summary.bbox)
             self.min_lng, self.min_lat, self.max_lng, self.max_lat = summary.bbox
             self.center_lng, self.center_lat = summary.center
+            self.length_m = summary.length_m
+            self.perimeter_m = summary.perimeter_m
+            self.area_m2 = summary.area_m2
+            self.vertex_count = summary.vertex_count
         else:
             self.geometry_type = ''
             self.bbox = []
@@ -341,6 +349,10 @@ class OperationTask(BaseDomainModel):
             self.max_lat = None
             self.center_lng = None
             self.center_lat = None
+            self.length_m = 0
+            self.perimeter_m = 0
+            self.area_m2 = 0
+            self.vertex_count = 0
 
         if self.status in {OperationTaskStatus.ASSIGNED, OperationTaskStatus.IN_PROGRESS} and not self.has_executor():
             raise ValidationError({'executor': 'La tarea requiere ejecutor para quedar asignada o en ejecucion.'})
@@ -522,4 +534,3 @@ class OperationReportExport(TimeStampedModel):
 
     def __str__(self):
         return self.file_name
-
