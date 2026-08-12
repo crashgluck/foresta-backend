@@ -38,9 +38,13 @@ def tasks_to_feature_collection(tasks):
                     'due_at': task.due_at.isoformat() if task.due_at else None,
                     'detected_at': task.detected_at.isoformat() if task.detected_at else None,
                     'geometry_source': source,
+                    'geometry_type': task.geometry_type,
+                    'length_m': task.length_m,
+                    'perimeter_m': task.perimeter_m,
+                    'area_m2': task.area_m2,
+                    'vertex_count': task.vertex_count,
                     'is_overdue': task.is_overdue,
                 },
             }
         )
     return {'type': 'FeatureCollection', 'features': features}
-
