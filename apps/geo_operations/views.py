@@ -163,6 +163,7 @@ class GeoAssetViewSet(CachedModelViewSet):
         file_format = (request.query_params.get('file_format') or '').lower()
         if file_format == 'pdf':
             return render_monthly_report_pdf(payload)
+        payload['items'] = [{key: value for key, value in item.items() if key != 'photo_path'} for item in payload['items']]
         return response.Response(payload)
 
     @decorators.action(detail=False, methods=['get'])
