@@ -387,14 +387,14 @@ def _photo_flowable(photo_path, report_image_class, cm):
         image = ImageOps.exif_transpose(image)
         if image.mode not in {'RGB', 'L'}:
             image = image.convert('RGB')
-        image.thumbnail((900, 680), PillowImage.Resampling.LANCZOS)
+        image.thumbnail((520, 390), PillowImage.Resampling.LANCZOS)
         buffer = BytesIO()
-        image.save(buffer, format='JPEG', quality=82, optimize=True)
+        image.save(buffer, format='JPEG', quality=68, optimize=True)
         buffer.seek(0)
 
         width, height = image.size
-        max_width = 3.2 * cm
-        max_height = 2.4 * cm
+        max_width = 3.0 * cm
+        max_height = 2.25 * cm
         scale = min(max_width / max(width, 1), max_height / max(height, 1))
         return report_image_class(buffer, width=width * scale, height=height * scale)
     except Exception:
