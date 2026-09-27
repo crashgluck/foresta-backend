@@ -1,7 +1,10 @@
 from datetime import timedelta
 
+from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from apps.accounts.models import UserActorType, UserRole
 from apps.core.parcel_display import primary_owner_prefetch
@@ -9,6 +12,9 @@ from apps.core.permissions import RoleBasedActionPermission
 from apps.core.viewsets import CachedModelViewSet
 from apps.missions.models import DroneFlight, Mission, MissionReport
 from apps.missions.serializers import DroneFlightSerializer, MissionReportSerializer, MissionSerializer
+
+
+RECO_MISSION_CODES = [f'RECO {number}' for number in range(1, 8)]
 
 
 class MissionViewSet(CachedModelViewSet):
@@ -33,7 +39,7 @@ class MissionViewSet(CachedModelViewSet):
 
 
 class DroneFlightViewSet(CachedModelViewSet):
-    queryset = DroneFlight.objects.select_related('pilot', 'parcela', 'persona').prefetch_related(primary_owner_prefetch())
+    queryset = DroneFlight.objects.select_related('pilot')
     serializer_class = DroneFlightSerializer
     permission_classes = [RoleBasedActionPermission]
     search_fields = [
@@ -43,10 +49,8 @@ class DroneFlightViewSet(CachedModelViewSet):
         'takeoff_platform',
         'notes',
         'pilot__username',
-        'parcela__codigo_parcela',
-        'persona__nombre_completo',
     ]
-    filterset_fields = ['pilot', 'parcela', 'mission_code', 'team_code', 'flight_datetime']
+    filterset_fields = ['pilot', 'mission_code', 'team_code', 'flight_datetime']
     ordering_fields = ['flight_datetime', 'created_at', 'mission_code', 'team_code']
 
     required_roles_per_action = {
@@ -60,6 +64,55 @@ class DroneFlightViewSet(CachedModelViewSet):
     disallowed_actor_types_per_action = {
         '*': [UserActorType.PORTAL_ACCESO]
     }
+
+    def _operator_counts(self, queryset):
+        return [
+            {
+                'operator': (
+                    row['pilot__username']
+                    or row['pilot__email']
+                    or 'Sin operador'
+                ),
+                'total': row['total'],
+            }
+            for row in queryset.values('pilot_id', 'pilot__username', 'pilot__email').annotate(total=Count('id')).order_by('-total', 'pilot__username')
+        ]
+
+    def _reco_breakdown(self, queryset):
+        return [
+            {
+                'mission_code': mission_code,
+                'total': mission_queryset.count(),
+                'by_operator': self._operator_counts(mission_queryset),
+            }
+            for mission_code in RECO_MISSION_CODES
+            for mission_queryset in [queryset.filter(mission_code=mission_code)]
+        ]
+
+    @action(detail=False, methods=['get'], url_path='summary')
+    def summary(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        reco_queryset = queryset.filter(mission_code__startswith='RECO')
+        brifo_queryset = queryset.filter(mission_code='BRIFO')
+        qrf_queryset = queryset.filter(mission_code='QRF')
+        notes_queryset = queryset.exclude(Q(notes__isnull=True) | Q(notes=''))
+
+        return Response(
+            {
+                'total': queryset.count(),
+                'by_operator': self._operator_counts(queryset),
+                'groups': {
+                    'reco': {
+                        'total': reco_queryset.count(),
+                        'by_operator': self._operator_counts(reco_queryset),
+                        'by_mission': self._reco_breakdown(queryset),
+                    },
+                    'brifo': {'total': brifo_queryset.count(), 'by_operator': self._operator_counts(brifo_queryset)},
+                    'qrf': {'total': qrf_queryset.count(), 'by_operator': self._operator_counts(qrf_queryset)},
+                    'notes': {'total': notes_queryset.count(), 'by_operator': self._operator_counts(notes_queryset)},
+                },
+            }
+        )
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -89,6 +142,13 @@ class DroneFlightViewSet(CachedModelViewSet):
         if user_id:
             queryset = queryset.filter(pilot_id=user_id)
         return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(pilot=self.request.user)
+
+    def perform_update(self, serializer):
+        pilot = serializer.instance.pilot or self.request.user
+        serializer.save(pilot=pilot)
 
 
 class MissionReportViewSet(CachedModelViewSet):
