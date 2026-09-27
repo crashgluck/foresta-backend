@@ -12,6 +12,25 @@ class MissionStatus(models.TextChoices):
     CANCELLED = 'cancelled', 'Cancelada'
 
 
+class DroneTeam(models.TextChoices):
+    SENTRY_32 = 'SENTRY_32', 'Sentry 32'
+    SENTRY_33 = 'SENTRY_33', 'Sentry 33'
+    SENTRY_ZOOM_31 = 'SENTRY_ZOOM_31', 'Sentry Zoom 31'
+    SENTRY_ENTERPRISE_30 = 'SENTRY_ENTERPRISE_30', 'Sentry Enterprise 30'
+
+
+class DroneMissionCode(models.TextChoices):
+    RECO_1 = 'RECO 1', 'RECO 1'
+    RECO_2 = 'RECO 2', 'RECO 2'
+    RECO_3 = 'RECO 3', 'RECO 3'
+    RECO_4 = 'RECO 4', 'RECO 4'
+    RECO_5 = 'RECO 5', 'RECO 5'
+    RECO_6 = 'RECO 6', 'RECO 6'
+    RECO_7 = 'RECO 7', 'RECO 7'
+    BRIFO = 'BRIFO', 'BRIFO'
+    QRF = 'QRF', 'QRF'
+
+
 class Mission(BaseDomainModel):
     title = models.CharField(max_length=180)
     description = models.TextField(blank=True)
@@ -37,8 +56,8 @@ class DroneFlight(BaseDomainModel):
     parcela = models.ForeignKey('parcels.Parcel', on_delete=models.SET_NULL, null=True, blank=True, related_name='drone_flights')
     persona = models.ForeignKey('people.Person', on_delete=models.SET_NULL, null=True, blank=True, related_name='drone_flights')
     flight_datetime = models.DateTimeField(default=timezone.now)
-    mission_code = models.CharField(max_length=40, blank=True)
-    team_code = models.CharField(max_length=40, blank=True)
+    mission_code = models.CharField(max_length=40, choices=DroneMissionCode.choices, blank=True)
+    team_code = models.CharField(max_length=40, choices=DroneTeam.choices, blank=True)
     battery_code = models.CharField(max_length=40, blank=True)
     takeoff_platform = models.CharField(max_length=80, blank=True)
     notes = models.TextField(blank=True)
