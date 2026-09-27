@@ -148,8 +148,15 @@ def build_monthly_report_payload(assets, *, params=None):
                 'criticality': asset.criticality,
                 'criticality_label': asset.get_criticality_display(),
                 'parcela_code': asset.parcela.codigo_parcela if asset.parcela_id else '',
+                'description': asset.description,
+                'observations': asset.observations,
+                'geometry_type': asset.geometry_type,
+                'length_m': asset.length_m,
+                'area_m2': asset.area_m2,
+                'vertex_count': asset.vertex_count,
                 'last_inspection_date': asset.last_inspection_date.isoformat() if asset.last_inspection_date else '',
                 'updated_at': asset.updated_at.isoformat() if asset.updated_at else '',
+                'photo_path': asset.photo.path if asset.photo else '',
             }
         )
 
@@ -229,7 +236,7 @@ def render_monthly_report_pdf(payload):
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
         from reportlab.lib.units import cm
-        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from reportlab.platypus import Image as ReportImage, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
     except ImportError as exc:
         raise serializers.ValidationError({'detail': 'No fue posible preparar el informe PDF.'}) from exc
 
@@ -306,7 +313,56 @@ def render_monthly_report_pdf(payload):
         )
     item_table = Table(item_rows, repeatRows=1, colWidths=[2.3 * cm, 4.6 * cm, 3.6 * cm, 2.1 * cm, 2.2 * cm, 2.3 * cm])
     item_table.setStyle(_table_style(colors))
-    story.append(item_table)
+    story.extend([item_table, Spacer(1, 0.25 * cm), Paragraph('Fichas con fotografia', section_style)])
+
+    photo_items = [item for item in payload['items'] if item.get('photo_path')]
+    detail_rows = [['Foto', 'Elemento', 'Informacion']]
+    for item in photo_items:
+        photo = '-'
+        if item.get('photo_path'):
+            photo = _photo_flowable(item['photo_path'], ReportImage, cm) or '-'
+
+        info_lines = [
+            f"Categoria: {item['category_name']}",
+            f"Estado: {item['operational_status_label']}",
+            f"Criticidad: {item['criticality_label']}",
+            f"Parcela: {item['parcela_code'] or '-'}",
+            f"Geometria: {item['geometry_type']}",
+            f"Ultima inspeccion: {item['last_inspection_date'] or '-'}",
+        ]
+        if item.get('description'):
+            info_lines.append(f"Descripcion: {item['description'][:180]}")
+        if item.get('observations'):
+            info_lines.append(f"Observaciones: {item['observations'][:180]}")
+
+        detail_rows.append(
+            [
+                photo,
+                Paragraph(f"<b>{item['title']}</b><br/>{item['code'] or ''}", styles['BodyText']),
+                Paragraph('<br/>'.join(info_lines), styles['BodyText']),
+            ]
+        )
+
+    if photo_items:
+        detail_table = Table(detail_rows, repeatRows=1, colWidths=[3.5 * cm, 4.4 * cm, 8.2 * cm])
+        detail_table.setStyle(
+            TableStyle(
+                [
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#14532d')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#cbd5e1')),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 7),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ]
+            )
+        )
+        story.append(detail_table)
+    else:
+        story.append(Paragraph('No hay elementos con fotografia en el periodo seleccionado.', styles['BodyText']))
 
     doc.build(story)
     buffer.seek(0)
@@ -314,6 +370,35 @@ def render_monthly_report_pdf(payload):
     filename = f"foresta-informe-mapa-{payload['period']['label']}.pdf".replace(' ', '-')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
+
+def _photo_flowable(photo_path, report_image_class, cm):
+    try:
+        from PIL import Image as PillowImage
+        from PIL import ImageOps
+    except ImportError:
+        try:
+            return report_image_class(photo_path, width=3.2 * cm, height=2.4 * cm)
+        except Exception:
+            return None
+
+    try:
+        image = PillowImage.open(photo_path)
+        image = ImageOps.exif_transpose(image)
+        if image.mode not in {'RGB', 'L'}:
+            image = image.convert('RGB')
+        image.thumbnail((900, 680), PillowImage.Resampling.LANCZOS)
+        buffer = BytesIO()
+        image.save(buffer, format='JPEG', quality=82, optimize=True)
+        buffer.seek(0)
+
+        width, height = image.size
+        max_width = 3.2 * cm
+        max_height = 2.4 * cm
+        scale = min(max_width / max(width, 1), max_height / max(height, 1))
+        return report_image_class(buffer, width=width * scale, height=height * scale)
+    except Exception:
+        return None
 
 
 def _table_style(colors):
