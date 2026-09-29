@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-import threading
+import logging
 from pathlib import Path
 
 from django.conf import settings
@@ -20,6 +20,7 @@ from apps.geo_operations.services.reports import build_monthly_report_payload, r
 
 
 PDF_JOB_TIMEOUT_SECONDS = getattr(settings, 'GEO_MONTHLY_REPORT_PDF_JOB_TIMEOUT_SECONDS', 60 * 60)
+logger = logging.getLogger(__name__)
 
 
 def start_monthly_report_pdf_job(params) -> dict:
@@ -34,20 +35,10 @@ def start_monthly_report_pdf_job(params) -> dict:
         return payload
 
     current_status = cache.get(status_key)
-    if current_status and current_status.get('status') in {'queued', 'running'}:
+    if current_status and current_status.get('status') == 'done' and file_path.exists():
         return current_status
 
-    queued_payload = {
-        'job_id': job_id,
-        'status': 'queued',
-        'message': 'Informe en cola de generacion.',
-        'download_url': '',
-    }
-    cache.set(status_key, queued_payload, timeout=PDF_JOB_TIMEOUT_SECONDS)
-
-    thread = threading.Thread(target=_run_monthly_report_pdf_job, args=(job_id, normalized_params), daemon=True)
-    thread.start()
-    return queued_payload
+    return _run_monthly_report_pdf_job(job_id, normalized_params)
 
 
 def get_monthly_report_pdf_job(job_id: str) -> dict:
@@ -104,19 +95,20 @@ def _run_monthly_report_pdf_job(job_id: str, params: dict):
         file_path = _job_file_path(job_id)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_bytes(response.content)
-        cache.set(status_key, _done_payload(job_id, params, file_path), timeout=PDF_JOB_TIMEOUT_SECONDS)
+        done_payload = _done_payload(job_id, params, file_path)
+        cache.set(status_key, done_payload, timeout=PDF_JOB_TIMEOUT_SECONDS)
+        return done_payload
     except Exception as exc:
-        cache.set(
-            status_key,
-            {
-                'job_id': job_id,
-                'status': 'failed',
-                'message': str(exc) or 'No fue posible generar el PDF.',
-                'download_url': '',
-                'params': params,
-            },
-            timeout=PDF_JOB_TIMEOUT_SECONDS,
-        )
+        logger.exception('No fue posible generar el PDF mensual de infraestructura. job_id=%s params=%s', job_id, params)
+        failed_payload = {
+            'job_id': job_id,
+            'status': 'failed',
+            'message': str(exc) or 'No fue posible generar el PDF.',
+            'download_url': '',
+            'params': params,
+        }
+        cache.set(status_key, failed_payload, timeout=PDF_JOB_TIMEOUT_SECONDS)
+        return failed_payload
     finally:
         close_old_connections()
 
