@@ -1,6 +1,7 @@
 import hashlib
 
 from django.core.cache import cache
+from rest_framework.response import Response
 
 API_CACHE_EPOCH_KEY = 'api:response-cache:epoch'
 
@@ -30,4 +31,28 @@ def bump_api_cache_epoch() -> int:
     except ValueError:
         cache.set(API_CACHE_EPOCH_KEY, 2, timeout=None)
         return 2
+
+
+def cached_api_response(prefix: str, request, timeout: int, payload_factory, *, vary_by_user: bool = False) -> Response:
+    timeout = int(timeout or 0)
+    if (
+        request.method != 'GET'
+        or timeout <= 0
+        or request.query_params.get('_fresh') in {'1', 'true', 'yes'}
+        or 'no-cache' in request.headers.get('Cache-Control', '').lower()
+    ):
+        return Response(payload_factory())
+
+    cache_key = request_cache_key(prefix, request, vary_by_user=vary_by_user)
+    cached_payload = cache.get(cache_key)
+    if cached_payload is not None:
+        response = Response(cached_payload)
+        response['X-Foresta-Cache'] = 'HIT'
+        return response
+
+    payload = payload_factory()
+    cache.set(cache_key, payload, timeout=timeout)
+    response = Response(payload)
+    response['X-Foresta-Cache'] = 'MISS'
+    return response
 

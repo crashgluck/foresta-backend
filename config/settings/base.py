@@ -161,10 +161,16 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 SERVE_MEDIA_FILES = env_bool('SERVE_MEDIA_FILES', DEBUG)
 
+CACHE_BACKEND = os.getenv('CACHE_BACKEND', 'django.core.cache.backends.locmem.LocMemCache')
+CACHE_LOCATION = os.getenv(
+    'CACHE_LOCATION',
+    str(BASE_DIR / '.cache' / 'django') if 'filebased' in CACHE_BACKEND.lower() else 'foresta-api',
+)
+
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': os.getenv('CACHE_LOCATION', 'foresta-api'),
+        'BACKEND': CACHE_BACKEND,
+        'LOCATION': CACHE_LOCATION,
         'TIMEOUT': env_int('CACHE_DEFAULT_TIMEOUT', 300, minimum=1),
         'OPTIONS': {
             'MAX_ENTRIES': env_int('CACHE_MAX_ENTRIES', 1000, minimum=100),
@@ -207,6 +213,13 @@ FINANCE_CONSOLIDATED_CACHE_SECONDS = env_int('FINANCE_CONSOLIDATED_CACHE_SECONDS
 MAPS_OWNERS_CACHE_SECONDS = env_int('MAPS_OWNERS_CACHE_SECONDS', 30, minimum=0)
 MAPS_OPTIONS_CACHE_SECONDS = env_int('MAPS_OPTIONS_CACHE_SECONDS', 0, minimum=0)
 MAPS_VISIT_SUMMARY_CACHE_SECONDS = env_int('MAPS_VISIT_SUMMARY_CACHE_SECONDS', 0, minimum=0)
+GEO_CHOICES_CACHE_SECONDS = env_int('GEO_CHOICES_CACHE_SECONDS', 300, minimum=0, maximum=3600)
+GEO_MAP_CACHE_SECONDS = env_int('GEO_MAP_CACHE_SECONDS', 30, minimum=0, maximum=300)
+GEO_MONTHLY_REPORT_CACHE_SECONDS = env_int('GEO_MONTHLY_REPORT_CACHE_SECONDS', 60, minimum=0, maximum=600)
+OPERATION_CHOICES_CACHE_SECONDS = env_int('OPERATION_CHOICES_CACHE_SECONDS', 300, minimum=0, maximum=3600)
+OPERATION_MAP_CACHE_SECONDS = env_int('OPERATION_MAP_CACHE_SECONDS', 30, minimum=0, maximum=300)
+OPERATION_SUMMARY_CACHE_SECONDS = env_int('OPERATION_SUMMARY_CACHE_SECONDS', 30, minimum=0, maximum=300)
+MISSION_SUMMARY_CACHE_SECONDS = env_int('MISSION_SUMMARY_CACHE_SECONDS', 30, minimum=0, maximum=300)
 
 AUDIT_TRAIL_ENABLED = env_bool('AUDIT_TRAIL_ENABLED', True)
 AUDIT_LOG_READS = env_bool('AUDIT_LOG_READS', False)

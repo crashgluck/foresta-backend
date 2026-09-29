@@ -1,9 +1,11 @@
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.utils import timezone
 from rest_framework import decorators, parsers, response, status, viewsets
 
 from apps.accounts.models import UserRole
+from apps.core.cache_utils import cached_api_response
 from apps.core.permissions import RoleBasedActionPermission
 from apps.core.viewsets import CachedModelViewSet
 from apps.operations.filters import OperationTaskFilter
@@ -295,24 +297,44 @@ class OperationTaskViewSet(CachedModelViewSet):
 
     @decorators.action(detail=False, methods=['get'])
     def choices(self, request):
-        return response.Response(operations_choice_payload())
+        return cached_api_response(
+            'operations:task-choices',
+            request,
+            settings.OPERATION_CHOICES_CACHE_SECONDS,
+            operations_choice_payload,
+        )
 
     @decorators.action(detail=False, methods=['get'])
     def map(self, request):
-        queryset = self.filter_queryset(self.get_queryset()).exclude(Q(geometry__isnull=True) & Q(geo_asset__isnull=True))[:1000]
-        serializer = self.get_serializer(queryset, many=True)
-        return response.Response(serializer.data)
+        def payload():
+            queryset = self.filter_queryset(self.get_queryset()).exclude(Q(geometry__isnull=True) & Q(geo_asset__isnull=True))[:1000]
+            serializer = self.get_serializer(queryset, many=True)
+            return serializer.data
+
+        return cached_api_response('operations:task-map', request, settings.OPERATION_MAP_CACHE_SECONDS, payload)
 
     @decorators.action(detail=False, methods=['get'])
     def geojson(self, request):
-        queryset = self.filter_queryset(self.get_queryset()).exclude(Q(geometry__isnull=True) & Q(geo_asset__isnull=True))[:1000]
-        return response.Response(tasks_to_feature_collection(queryset))
+        def payload():
+            queryset = self.filter_queryset(self.get_queryset()).exclude(Q(geometry__isnull=True) & Q(geo_asset__isnull=True))[:1000]
+            return tasks_to_feature_collection(queryset)
+
+        return cached_api_response('operations:task-geojson', request, settings.OPERATION_MAP_CACHE_SECONDS, payload)
 
     @decorators.action(detail=False, methods=['get'])
     def summary(self, request):
-        queryset = self.filter_queryset(self.get_queryset())
-        start, end = self._period_bounds()
-        return response.Response(build_summary(queryset, start=start, end=end, include_costs=can_view_costs(request.user)))
+        def payload():
+            queryset = self.filter_queryset(self.get_queryset())
+            start, end = self._period_bounds()
+            return build_summary(queryset, start=start, end=end, include_costs=can_view_costs(request.user))
+
+        return cached_api_response(
+            'operations:task-summary',
+            request,
+            settings.OPERATION_SUMMARY_CACHE_SECONDS,
+            payload,
+            vary_by_user=True,
+        )
 
     @decorators.action(detail=False, methods=['get'], url_path='report-pdf')
     def report_pdf(self, request):

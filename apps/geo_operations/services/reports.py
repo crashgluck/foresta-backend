@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime
 from io import BytesIO
+from pathlib import Path
 import re
 
 from django.http import HttpResponse
@@ -251,33 +252,105 @@ def render_monthly_report_pdf(payload):
         title='Informe mensual de instalaciones',
     )
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('ReportTitle', parent=styles['Title'], textColor=colors.HexColor('#14532d'), spaceAfter=6)
-    subtitle_style = ParagraphStyle('ReportSubtitle', parent=styles['BodyText'], textColor=colors.HexColor('#475569'), spaceAfter=12)
-    section_style = ParagraphStyle('ReportSection', parent=styles['Heading2'], textColor=colors.HexColor('#0f172a'), fontSize=13, spaceBefore=14)
+    title_style = ParagraphStyle(
+        'ReportTitle',
+        parent=styles['Title'],
+        alignment=2,
+        fontSize=18,
+        leading=21,
+        textColor=colors.HexColor('#0f172a'),
+        spaceAfter=4,
+    )
+    subtitle_style = ParagraphStyle(
+        'ReportSubtitle',
+        parent=styles['BodyText'],
+        alignment=2,
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor('#64748b'),
+    )
+    eyebrow_style = ParagraphStyle(
+        'ReportEyebrow',
+        parent=styles['BodyText'],
+        alignment=2,
+        fontSize=7,
+        leading=9,
+        textColor=colors.HexColor('#166534'),
+        fontName='Helvetica-Bold',
+    )
+    section_style = ParagraphStyle(
+        'ReportSection',
+        parent=styles['Heading2'],
+        textColor=colors.HexColor('#0f172a'),
+        fontSize=11,
+        leading=14,
+        spaceBefore=14,
+        spaceAfter=6,
+        fontName='Helvetica-Bold',
+    )
+    body_style = ParagraphStyle('ReportBody', parent=styles['BodyText'], fontSize=8, leading=10, textColor=colors.HexColor('#334155'))
 
     summary = payload['summary']
-    story = [
-        Paragraph('Informe mensual de instalaciones', title_style),
-        Paragraph(f"Periodo: {payload['period']['label']} ({payload['period']['date_from']} a {payload['period']['date_to']})", subtitle_style),
-    ]
-
-    summary_rows = [
-        ['Puntos', summary['total_assets'], 'Pendientes', summary['pending_tasks']],
-        ['Realizados', summary['done_tasks'], 'Avance', f"{summary['completion_rate']}%"],
-        ['Luminarias activas', summary['monthly_active_lights'], 'Por cambiar', summary['monthly_lights_to_replace']],
-    ]
-    summary_table = Table(summary_rows, colWidths=[4.1 * cm, 2.5 * cm, 4.1 * cm, 2.5 * cm])
-    summary_table.setStyle(
+    logo = _logo_flowable(ReportImage, cm)
+    header_table = Table(
+        [
+            [
+                logo or '',
+                [
+                    Paragraph('LA FORESTA DE ZAPALLAR', eyebrow_style),
+                    Paragraph('Informe mensual de instalaciones', title_style),
+                    Paragraph(
+                        f"Periodo {payload['period']['label']} | {payload['period']['date_from']} a {payload['period']['date_to']}",
+                        subtitle_style,
+                    ),
+                ],
+            ]
+        ],
+        colWidths=[4.0 * cm, 12.6 * cm],
+    )
+    header_table.setStyle(
         TableStyle(
             [
                 ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
-                ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#0f172a')),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+                ('BOX', (0, 0), (-1, -1), 0.7, colors.HexColor('#dbe7dd')),
+                ('LINEBELOW', (0, 0), (-1, -1), 2, colors.HexColor('#166534')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ]
+        )
+    )
+    story = [header_table, Spacer(1, 0.35 * cm)]
+
+    summary_rows = [
+        ['PUNTOS', summary['total_assets'], 'PENDIENTES', summary['pending_tasks'], 'REALIZADOS', summary['done_tasks']],
+        ['CON FOTOGRAFIA', summary['with_photos'], 'LUMINARIAS ACTIVAS', summary['monthly_active_lights'], 'POR CAMBIAR', summary['monthly_lights_to_replace']],
+    ]
+    summary_table = Table(summary_rows, colWidths=[3.3 * cm, 2.1 * cm, 3.3 * cm, 2.1 * cm, 3.3 * cm, 2.1 * cm])
+    summary_table.setStyle(
+        TableStyle(
+            [
+                ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#334155')),
+                ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#14532d')),
+                ('TEXTCOLOR', (3, 0), (3, -1), colors.HexColor('#14532d')),
+                ('TEXTCOLOR', (5, 0), (5, -1), colors.HexColor('#14532d')),
+                ('BOX', (0, 0), (-1, -1), 0.6, colors.HexColor('#dbe7dd')),
+                ('INNERGRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#e2e8f0')),
                 ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 7.5),
+                ('FONTSIZE', (1, 0), (1, -1), 13),
+                ('FONTSIZE', (3, 0), (3, -1), 13),
+                ('FONTSIZE', (5, 0), (5, -1), 13),
                 ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
                 ('ALIGN', (3, 0), (3, -1), 'RIGHT'),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('ALIGN', (5, 0), (5, -1), 'RIGHT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 9),
+                ('TOPPADDING', (0, 0), (-1, -1), 9),
             ]
         )
     )
@@ -299,11 +372,10 @@ def render_monthly_report_pdf(payload):
     category_table.setStyle(_table_style(colors))
     story.extend([category_table, Spacer(1, 0.2 * cm), Paragraph('Detalle operativo', section_style)])
 
-    item_rows = [['Estado', 'Punto', 'Categoria', 'Parcela', 'Criticidad', 'Ultima insp.']]
+    item_rows = [['Punto', 'Categoria', 'Parcela', 'Criticidad', 'Ultima insp.']]
     for item in payload['items'][:35]:
         item_rows.append(
             [
-                item['task_status_label'],
                 item['title'][:34],
                 item['category_name'][:24],
                 item['parcela_code'] or '-',
@@ -311,7 +383,7 @@ def render_monthly_report_pdf(payload):
                 item['last_inspection_date'] or '-',
             ]
         )
-    item_table = Table(item_rows, repeatRows=1, colWidths=[2.3 * cm, 4.6 * cm, 3.6 * cm, 2.1 * cm, 2.2 * cm, 2.3 * cm])
+    item_table = Table(item_rows, repeatRows=1, colWidths=[5.0 * cm, 4.0 * cm, 2.4 * cm, 2.6 * cm, 2.6 * cm])
     item_table.setStyle(_table_style(colors))
     story.extend([item_table, Spacer(1, 0.25 * cm), Paragraph('Fichas con fotografia', section_style)])
 
@@ -322,29 +394,27 @@ def render_monthly_report_pdf(payload):
         if item.get('photo_path'):
             photo = _photo_flowable(item['photo_path'], ReportImage, cm) or '-'
 
-        info_lines = [
-            f"Categoria: {item['category_name']}",
-            f"Estado: {item['operational_status_label']}",
-            f"Criticidad: {item['criticality_label']}",
-            f"Parcela: {item['parcela_code'] or '-'}",
-            f"Geometria: {item['geometry_type']}",
-            f"Ultima inspeccion: {item['last_inspection_date'] or '-'}",
-        ]
-        if item.get('description'):
-            info_lines.append(f"Descripcion: {item['description'][:180]}")
-        if item.get('observations'):
-            info_lines.append(f"Observaciones: {item['observations'][:180]}")
+        info_lines = _filled_info_lines(
+            [
+                ('Categoria', item['category_name']),
+                ('Criticidad', item['criticality_label']),
+                ('Parcela', item['parcela_code']),
+                ('Ultima inspeccion', item['last_inspection_date']),
+                ('Descripcion', item.get('description'), 180),
+                ('Observaciones', item.get('observations'), 180),
+            ]
+        )
 
         detail_rows.append(
             [
                 photo,
-                Paragraph(f"<b>{item['title']}</b><br/>{item['code'] or ''}", styles['BodyText']),
-                Paragraph('<br/>'.join(info_lines), styles['BodyText']),
+                Paragraph(f"<b>{item['title']}</b><br/>{item['code'] or ''}", body_style),
+                Paragraph('<br/>'.join(info_lines), body_style),
             ]
         )
 
     if photo_items:
-        detail_table = Table(detail_rows, repeatRows=1, colWidths=[3.5 * cm, 4.4 * cm, 8.2 * cm])
+        detail_table = Table(detail_rows, repeatRows=1, colWidths=[8.0 * cm, 3.0 * cm, 6.0 * cm])
         detail_table.setStyle(
             TableStyle(
                 [
@@ -378,7 +448,7 @@ def _photo_flowable(photo_path, report_image_class, cm):
         from PIL import ImageOps
     except ImportError:
         try:
-            return report_image_class(photo_path, width=3.2 * cm, height=2.4 * cm)
+            return report_image_class(photo_path, width=7.6 * cm, height=5.7 * cm)
         except Exception:
             return None
 
@@ -387,18 +457,55 @@ def _photo_flowable(photo_path, report_image_class, cm):
         image = ImageOps.exif_transpose(image)
         if image.mode not in {'RGB', 'L'}:
             image = image.convert('RGB')
-        image.thumbnail((520, 390), PillowImage.Resampling.LANCZOS)
+        image.thumbnail((1200, 900), PillowImage.Resampling.LANCZOS)
         buffer = BytesIO()
-        image.save(buffer, format='JPEG', quality=68, optimize=True)
+        image.save(buffer, format='JPEG', quality=72, optimize=True)
         buffer.seek(0)
 
         width, height = image.size
-        max_width = 3.0 * cm
-        max_height = 2.25 * cm
+        max_width = 7.6 * cm
+        max_height = 5.7 * cm
         scale = min(max_width / max(width, 1), max_height / max(height, 1))
         return report_image_class(buffer, width=width * scale, height=height * scale)
     except Exception:
         return None
+
+
+def _logo_flowable(report_image_class, cm):
+    logo_path = _find_frontend_logo_path()
+    if not logo_path:
+        return None
+    try:
+        image = report_image_class(str(logo_path))
+        image._restrictSize(2.8 * cm, 1.7 * cm)
+        return image
+    except Exception:
+        return None
+
+
+def _find_frontend_logo_path():
+    current_path = Path(__file__).resolve()
+    for parent in current_path.parents:
+        logo_path = parent / 'frontend' / 'foresta-frontend' / 'src' / 'assets' / 'images' / 'logo-foresta.png'
+        if logo_path.exists():
+            return logo_path
+    return None
+
+
+def _filled_info_lines(fields):
+    lines = []
+    for field in fields:
+        label, value, *limit = field
+        if value in (None, ''):
+            continue
+        value = str(value).strip()
+        if not value or value == '-':
+            continue
+        max_length = limit[0] if limit else None
+        if max_length:
+            value = value[:max_length]
+        lines.append(f'{label}: {value}')
+    return lines
 
 
 def _table_style(colors):
