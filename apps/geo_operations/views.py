@@ -1,8 +1,10 @@
+from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, Q
 from rest_framework import decorators, exceptions, parsers, response, status, viewsets
 
 from apps.accounts.models import UserRole
+from apps.core.cache_utils import cached_api_response
 from apps.core.permissions import RoleBasedActionPermission
 from apps.core.viewsets import CachedModelViewSet
 from apps.geo_operations.models import GeoAsset, GeoAssetCategory
@@ -147,24 +149,45 @@ class GeoAssetViewSet(CachedModelViewSet):
 
     @decorators.action(detail=False, methods=['get'])
     def choices(self, request):
-        return response.Response(geo_asset_choice_payload())
+        return cached_api_response(
+            'geo-operations:asset-choices',
+            request,
+            settings.GEO_CHOICES_CACHE_SECONDS,
+            geo_asset_choice_payload,
+        )
 
     @decorators.action(detail=False, methods=['get'])
     def map(self, request):
-        queryset = self.filter_queryset(self.get_queryset())
-        assets = filter_assets_by_task_status(queryset[:2000], request.query_params.get('task_status'))[:1000]
-        serializer = GeoAssetMapSerializer(assets, many=True, context={'request': request})
-        return response.Response(serializer.data)
+        def payload():
+            queryset = self.filter_queryset(self.get_queryset())
+            assets = filter_assets_by_task_status(queryset[:2000], request.query_params.get('task_status'))[:1000]
+            serializer = GeoAssetMapSerializer(assets, many=True, context={'request': request})
+            return serializer.data
+
+        return cached_api_response('geo-operations:asset-map', request, settings.GEO_MAP_CACHE_SECONDS, payload)
 
     @decorators.action(detail=False, methods=['get'], url_path='monthly-report')
     def monthly_report(self, request):
-        queryset = self.filter_queryset(self.get_queryset())[:5000]
-        payload = build_monthly_report_payload(queryset, params=request.query_params)
         file_format = (request.query_params.get('file_format') or '').lower()
         if file_format == 'pdf':
+            queryset = self.filter_queryset(self.get_queryset())[:5000]
+            payload = build_monthly_report_payload(queryset, params=request.query_params)
             return render_monthly_report_pdf(payload)
-        payload['items'] = [{key: value for key, value in item.items() if key != 'photo_path'} for item in payload['items']]
-        return response.Response(payload)
+
+        def payload():
+            queryset = self.filter_queryset(self.get_queryset())[:5000]
+            report_payload = build_monthly_report_payload(queryset, params=request.query_params)
+            report_payload['items'] = [
+                {key: value for key, value in item.items() if key != 'photo_path'} for item in report_payload['items']
+            ]
+            return report_payload
+
+        return cached_api_response(
+            'geo-operations:monthly-report',
+            request,
+            settings.GEO_MONTHLY_REPORT_CACHE_SECONDS,
+            payload,
+        )
 
     @decorators.action(detail=False, methods=['get'])
     def export(self, request):

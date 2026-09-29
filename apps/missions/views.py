@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import viewsets
@@ -7,6 +8,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.accounts.models import UserActorType, UserRole
+from apps.core.cache_utils import cached_api_response
 from apps.core.parcel_display import primary_owner_prefetch
 from apps.core.permissions import RoleBasedActionPermission
 from apps.core.viewsets import CachedModelViewSet
@@ -91,14 +93,13 @@ class DroneFlightViewSet(CachedModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='summary')
     def summary(self, request):
-        queryset = self.filter_queryset(self.get_queryset())
-        reco_queryset = queryset.filter(mission_code__startswith='RECO')
-        brifo_queryset = queryset.filter(mission_code='BRIFO')
-        qrf_queryset = queryset.filter(mission_code='QRF')
-        notes_queryset = queryset.exclude(Q(notes__isnull=True) | Q(notes=''))
-
-        return Response(
-            {
+        def payload():
+            queryset = self.filter_queryset(self.get_queryset())
+            reco_queryset = queryset.filter(mission_code__startswith='RECO')
+            brifo_queryset = queryset.filter(mission_code='BRIFO')
+            qrf_queryset = queryset.filter(mission_code='QRF')
+            notes_queryset = queryset.exclude(Q(notes__isnull=True) | Q(notes=''))
+            return {
                 'total': queryset.count(),
                 'by_operator': self._operator_counts(queryset),
                 'groups': {
@@ -112,7 +113,8 @@ class DroneFlightViewSet(CachedModelViewSet):
                     'notes': {'total': notes_queryset.count(), 'by_operator': self._operator_counts(notes_queryset)},
                 },
             }
-        )
+
+        return cached_api_response('missions:drone-flight-summary', request, settings.MISSION_SUMMARY_CACHE_SECONDS, payload)
 
     def get_queryset(self):
         queryset = super().get_queryset()
