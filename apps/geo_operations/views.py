@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, Q
+from django.http import FileResponse
 from rest_framework import decorators, exceptions, parsers, response, status, viewsets
 
 from apps.accounts.models import UserRole
@@ -16,6 +17,11 @@ from apps.geo_operations.serializers import (
 )
 from apps.geo_operations.services.geometry import bbox_intersects_filter, parse_bbox
 from apps.geo_operations.services.kml import export_response
+from apps.geo_operations.services.pdf_jobs import (
+    get_monthly_report_pdf_file,
+    get_monthly_report_pdf_job,
+    start_monthly_report_pdf_job,
+)
 from apps.geo_operations.services.reports import (
     build_monthly_report_payload,
     filter_assets_by_task_status,
@@ -64,6 +70,8 @@ class GeoAssetViewSet(CachedModelViewSet):
         'choices': UserRole.CONSULTA,
         'export': UserRole.CONSULTA,
         'monthly_report': UserRole.CONSULTA,
+        'monthly_report_pdf_job': UserRole.CONSULTA,
+        'monthly_report_pdf_download': UserRole.CONSULTA,
         'create': UserRole.OPERADOR,
         'update': UserRole.OPERADOR,
         'partial_update': UserRole.OPERADOR,
@@ -188,6 +196,18 @@ class GeoAssetViewSet(CachedModelViewSet):
             settings.GEO_MONTHLY_REPORT_CACHE_SECONDS,
             payload,
         )
+
+    @decorators.action(detail=False, methods=['get'], url_path='monthly-report-pdf-job')
+    def monthly_report_pdf_job(self, request):
+        job_id = request.query_params.get('job_id')
+        if job_id:
+            return response.Response(get_monthly_report_pdf_job(job_id))
+        return response.Response(start_monthly_report_pdf_job(request.query_params))
+
+    @decorators.action(detail=False, methods=['get'], url_path='monthly-report-pdf-download')
+    def monthly_report_pdf_download(self, request):
+        file_path, filename = get_monthly_report_pdf_file(request.query_params.get('job_id'))
+        return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=filename, content_type='application/pdf')
 
     @decorators.action(detail=False, methods=['get'])
     def export(self, request):
