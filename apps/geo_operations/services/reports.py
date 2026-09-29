@@ -459,7 +459,7 @@ def _photo_flowable(photo_path, report_image_class, cm):
             image = image.convert('RGB')
         image.thumbnail((1200, 900), PillowImage.Resampling.LANCZOS)
         buffer = BytesIO()
-        image.save(buffer, format='JPEG', quality=72, optimize=True)
+        image.save(buffer, format='JPEG', quality=70)
         buffer.seek(0)
 
         width, height = image.size
